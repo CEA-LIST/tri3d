@@ -1,0 +1,7 @@
+﻿Transformation
+==============
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: Transformation
+    :inherited-members:

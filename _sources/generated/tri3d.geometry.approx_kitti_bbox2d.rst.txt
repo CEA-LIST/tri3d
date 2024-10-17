@@ -1,0 +1,7 @@
+﻿approx\_kitti\_bbox2d
+=====================
+
+.. currentmodule:: tri3d.geometry
+
+.. autofunction:: approx_kitti_bbox2d
+    

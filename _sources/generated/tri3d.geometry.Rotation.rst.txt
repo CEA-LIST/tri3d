@@ -1,0 +1,7 @@
+﻿Rotation
+========
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: Rotation
+    :inherited-members:

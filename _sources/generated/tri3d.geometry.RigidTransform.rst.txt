@@ -1,0 +1,7 @@
+﻿RigidTransform
+==============
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: RigidTransform
+    :inherited-members:

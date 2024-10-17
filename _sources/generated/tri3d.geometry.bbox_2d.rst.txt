@@ -1,0 +1,7 @@
+﻿bbox\_2d
+========
+
+.. currentmodule:: tri3d.geometry
+
+.. autofunction:: bbox_2d
+    
