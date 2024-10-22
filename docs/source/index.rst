@@ -81,7 +81,7 @@ All datasets implement a common interface which provides access to data samples 
 Moreover, a powerful :meth:`.alignment() <tri3d.datasets.NuScenes.alignment>` 
 function can compute the geometric transformation between any pair of frame 
 and sensors coordinates.
-The :ref:`tutorial notebook <Getting-started>` goes through most of these functions.
+The `tutorial notebook <./example.ipynb>`_ goes through most of these functions.
 
 .. note::
 
@@ -112,8 +112,8 @@ Transformations have a :class:`shared interface <tri3d.geometry.Transformation>`
 - **Composition**: it is possible to chain transformation together.
 - **Inversion**: the inverse of a transformation is readily available.
 
-Object and sensor poses
------------------------
+Objects and sensors poses
+-------------------------
 
 In Tri3D, the position and orientation of objects (or sensors) in a coordinate system
 are stored as geometric transformation.

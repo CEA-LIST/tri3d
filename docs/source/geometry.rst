@@ -31,5 +31,3 @@ Utilities
 
    where_in_box
    test_box_in_frame
-   bbox_2d
-   approx_kitti_bbox2d
