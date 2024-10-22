@@ -224,8 +224,6 @@ class Rotation(Transformation):
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, Rotation):
-            print(self.quat)
-            print(other.quat)
             return self.__class__(quaternion_multiply(self.quat, other.quat))
 
         elif isinstance(other, Translation):
@@ -516,15 +514,15 @@ def where_in_box(pts, size, box2sensor: Transformation):
     return np.where(inside[:, 0] & inside[:, 1] & inside[:, 2])[0]
 
 
-# def test_box_in_frame(obj2img, obj_size, img_size):
-#     """Return whether any of a box corner points lands within an image."""
-#     pts_2d = obj2img.apply(cube_edges * obj_size)
-#     in_frame = (
-#         (pts_2d[:, 2] > 0)
-#         & np.all(pts_2d > 0, axis=1)
-#         & np.all(pts_2d[:, :2] < [img_size], axis=1)
-#     )
-#     return any(in_frame)
+def test_box_in_frame(obj2img, obj_size, img_size):
+    """Return whether any of a box corner points lands within an image."""
+    pts_2d = obj2img.apply(cube_edges * obj_size)
+    in_frame = (
+        (pts_2d[:, 2] > 0)
+        & np.all(pts_2d > 0, axis=1)
+        & np.all(pts_2d[:, :2] < [img_size], axis=1)
+    )
+    return any(in_frame)
 
 
 # def bbox_2d(obj2img, size, imsize):
