@@ -1,11 +1,23 @@
+import itertools
+
 import numpy as np
 import pytest
-from tri3d.geometry import AffineTransform, Rotation, Translation, RigidTransform
+from tri3d.geometry import (
+    AffineTransform,
+    Rotation,
+    Translation,
+    RigidTransform,
+    Pipeline,
+)
 from scipy.spatial.transform import Rotation as SPRotation
 
 
 rnd_seed = 0
-transform_classes = (AffineTransform, Rotation, Translation, RigidTransform)
+transform_classes = (AffineTransform, Rotation, Translation, RigidTransform, Pipeline)
+
+
+def equal_quat(q1, q2):
+    return np.allclose(q1 * np.sign(q1[..., 0, None]), q2 * np.sign(q2[..., 0, None]))
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +42,12 @@ def gen_args(cls, shape):
         return (vec,)
     elif issubclass(cls, RigidTransform):
         quat, vec = np.split(np.random.randn(*shape, 7), [4], axis=-1)
+        quat /= np.linalg.norm(quat, axis=-1, keepdims=True)
         return quat, vec
+    elif issubclass(cls, Pipeline):
+        quat, vec = np.split(np.random.randn(*shape, 7), [4], axis=-1)
+        quat /= np.linalg.norm(quat, axis=-1, keepdims=True)
+        return Translation(vec), Rotation(quat)
 
 
 def test_affine():
@@ -49,11 +66,28 @@ def test_rotation():
     transform = Rotation(quat)
     point = np.random.randn(3)
 
+    # apply
     actual = transform.apply(point)
     w, x, y, z = quat
-    expected = SPRotation.from_quat([x, y, z, w]).apply(point)
-
+    expected = SPRotation([x, y, z, w]).apply(point)
     assert actual == pytest.approx(expected)
+
+
+def test_rotation_conversion():
+    (quat,) = gen_args(Rotation, [10])
+    refrot = SPRotation.from_quat(quat[:, [1, 2, 3, 0]])
+
+    # from_matrix
+    actual = Rotation.from_matrix(refrot.as_matrix()).quat
+    assert equal_quat(actual, quat)
+
+    for seq in ["XYZ", "XYX", "xyz"]:
+        actual = Rotation.from_euler(seq, refrot.as_euler(seq)).quat
+        assert equal_quat(actual, quat)
+
+        actual = Rotation(quat).as_euler(seq)
+        expected = refrot.as_euler(seq)
+        assert actual == pytest.approx(expected)
 
 
 def test_translation():
@@ -76,6 +110,19 @@ def test_rigid():
     expected = Rotation(quat).apply(point) + vec
 
     assert actual == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("t1_shape", [(), (10,)])
+@pytest.mark.parametrize("t2_shape", [(), (10,)])
+def test_pipeline(t1_shape, t2_shape):
+    for T1, T2 in itertools.product(transform_classes, transform_classes):
+        t1 = T1(*gen_args(T1, t1_shape))
+        t2 = T2(*gen_args(T2, t2_shape))
+        tp = Pipeline(t1, t2)
+        point = np.random.randn(10, 3)
+        predicted = tp.apply(point)
+        expected = t2.apply(t1.apply(point))
+        assert predicted == pytest.approx(expected)
 
 
 @pytest.mark.parametrize("transform_cls", transform_classes)

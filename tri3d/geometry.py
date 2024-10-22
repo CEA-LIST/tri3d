@@ -3,8 +3,15 @@ from abc import ABC, abstractmethod
 from typing import Self
 
 import numpy as np
-from scipy.spatial.transform import Rotation as SPRotation
-import shapely.geometry
+
+from .camera import project_kannala, project_pinhole
+from .quaternion import (
+    quaternion_multiply,
+    quaternion_rotation_matrix,
+    slerp,
+    as_euler,
+    from_euler,
+)
 
 
 __all__ = [
@@ -16,148 +23,7 @@ __all__ = [
     "RigidTransform",
     "CameraProjection",
     "where_in_box",
-    "test_box_in_frame",
-    "bbox_2d",
-    "approx_kitti_bbox2d",
 ]
-
-
-def slerp(q0, q1, t):
-    q0 = np.asarray(q0)
-    q1 = np.asarray(q1)
-    t = np.asarray(t)
-
-    dot = (q0 * q1).sum(axis=-1).clip(-1, 1)
-
-    # Simple linear approximation
-    out_linear = q0 + np.expand_dims(t, -1) * (q1 - q0)
-    out_linear /= np.linalg.norm(out_linear, axis=-1, keepdims=True)
-
-    # Slerp
-    theta_0 = np.arccos(dot)  # theta_0 = angle between input vectors
-    theta = theta_0 * t  # theta = angle between v0 and result
-
-    q2 = q1 - q0 * dot
-    q2 /= np.linalg.norm(q2, axis=-1, keepdims=True).clip(min=1e-6)
-
-    out_slerp = q0 * np.cos(theta) + q2 * np.sin(theta)
-
-    return np.where(dot > 0.9995, out_linear, out_slerp)
-
-
-def quaternion_multiply(q0, q1):
-    q0 = np.asarray(q0)
-    q1 = np.asarray(q1)
-
-    w0 = q0[..., 0]
-    x0 = q0[..., 1]
-    y0 = q0[..., 2]
-    z0 = q0[..., 3]
-
-    w1 = q1[..., 0]
-    x1 = q1[..., 1]
-    y1 = q1[..., 2]
-    z1 = q1[..., 3]
-
-    out = np.empty_like(q0)
-    out[..., 0] = -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0
-    out[..., 1] = x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0
-    out[..., 2] = -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0
-    out[..., 3] = x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0
-
-    return out
-
-
-def quaternion_rotation_matrix(Q):
-    """
-    Covert a quaternion into a full three-dimensional rotation matrix.
-
-    Input
-    :param Q: A 4 element array representing the quaternion (q0,q1,q1,q3)
-
-    Output
-    :return: A 3x3 element matrix representing the full 3D rotation matrix.
-             This rotation matrix converts a point in the local reference
-             frame to a point in the global reference frame.
-    """
-    Q = np.asarray(Q)
-
-    w = Q[..., 0]
-    x = Q[..., 1]
-    y = Q[..., 2]
-    z = Q[..., 3]
-
-    mat = np.zeros(Q.shape[:-1] + (4, 4))
-
-    mat[..., 0, 0] = 1.0 - 2.0 * y * y - 2.0 * z * z
-    mat[..., 0, 1] = 2.0 * x * y - 2.0 * z * w
-    mat[..., 0, 2] = 2.0 * x * z + 2.0 * y * w
-
-    mat[..., 1, 0] = 2.0 * x * y + 2.0 * z * w
-    mat[..., 1, 1] = 1.0 - 2.0 * x * x - 2.0 * z * z
-    mat[..., 1, 2] = 2.0 * y * z - 2.0 * x * w
-
-    mat[..., 2, 0] = 2.0 * x * z - 2.0 * y * w
-    mat[..., 2, 1] = 2.0 * y * z + 2.0 * x * w
-    mat[..., 2, 2] = 1.0 - 2.0 * x * x - 2.0 * y * y
-
-    mat[..., 3, 3] = 1
-
-    return mat
-
-
-def project_pinhole(
-    xyz,
-    fx: float,
-    fy: float,
-    cx: float,
-    cy: float,
-    k1: float = 0.0,
-    p1: float = 0.0,
-    p2: float = 0.0,
-):
-    z = xyz[..., 2]
-    x = np.sign(z) * xyz[..., 0] / z
-    y = np.sign(z) * xyz[..., 1] / z
-
-    r2 = np.square(x) + np.square(y)
-
-    radial_factor = 1 + k1 * r2
-    x_ = x * radial_factor + 2 * p1 * x * y + p2 * (r2 + 2 * x**2)
-    y_ = y * radial_factor + p1 * (r2 + 2 * y**2) + 2 * p2 * x * y
-
-    u = fx * x_ + cx
-    v = fy * y_ + cy
-
-    return np.stack([u, v, z], axis=-1)
-
-
-def project_kannala(
-    xyz: np.ndarray,
-    fx: float,
-    fy: float,
-    cx: float,
-    cy: float,
-    k1: float,
-    k2: float,
-    k3: float,
-    k4: float,
-) -> np.ndarray:
-    """original code from https://github.com/zenseact/zod/blob/main/zod/utils/geometry.py"""
-    norm_data = np.hypot(xyz[..., 0], xyz[..., 1])
-    radial = np.arctan2(norm_data, xyz[..., 2])
-    radial2 = radial**2
-    radial4 = radial2**2
-    radial6 = radial4 * radial2
-    radial8 = radial4**2
-    distortion_angle = radial * (
-        1 + k1 * radial2 + k2 * radial4 + k3 * radial6 + k4 * radial8
-    )
-    u_dist = distortion_angle * xyz[..., 0] / norm_data
-    v_dist = distortion_angle * xyz[..., 1] / norm_data
-    pos_u = fx * u_dist + cx
-    pos_v = fy * v_dist + cy
-    return np.stack((pos_u, pos_v, xyz[..., 2]), axis=-1)
 
 
 cube_edges = np.array(
@@ -264,6 +130,9 @@ class Pipeline(Transformation):
         return max([len(op) for op in self.operations if not op.single])
 
     def __getitem__(self, item) -> Self:
+        if self.single:
+            raise TypeError("cannot index single transform")
+
         return self.__class__(
             *[op if op.single else op[item] for op in self.operations]
         )
@@ -292,11 +161,8 @@ class AffineTransform(Transformation):
     """
 
     def __init__(self, mat: np.ndarray):
-        mat = np.asarray(mat)
-        mat = np.pad(mat, (4 - mat.shape[-2], 4 - mat.shape[-1]))
-        mat[..., 3:, :] = np.eye(1, 4, k=3)
-
-        self.mat = mat
+        self.mat = np.tile(np.eye(4), mat.shape[:-2] + (1, 1))
+        self.mat[..., :mat.shape[-2], :mat.shape[-1]] = mat
 
     @property
     def single(self) -> bool:
@@ -345,83 +211,75 @@ class Rotation(Transformation):
     """A Rotation defined by a quaternion (w, x, y, z)."""
 
     def __init__(self, quat):
-        quat = np.asarray(quat)
-
-        self.rot = SPRotation.from_quat(quat[..., [1, 2, 3, 0]])
-        self.mat = self.rot.as_matrix()
+        self.quat = np.asarray(quat)
+        self.mat = quaternion_rotation_matrix(self.quat)
 
     def __repr__(self):
         if self.single:
-            yaw, pitch, roll = self.rot.as_euler("ZYX", degrees=True)
+            yaw, pitch, roll = self.as_euler("ZYX", degrees=True)
             return f"Rotation([{yaw:2.0f}°, {pitch:2.0f}°, {roll:2.0f}°])"
         else:
-            yaw, pitch, roll = self.rot.as_euler("ZYX", degrees=True)[0]
+            yaw, pitch, roll = self.as_euler("ZYX", degrees=True)[0]
             return f"Rotation([[{yaw:2.0f}°, {pitch:2.0f}°, {roll:2.0f}°], ...])"
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, Rotation):
-            return self.__class__((self.rot * other.rot).as_quat()[..., [3, 0, 1, 2]])
+            print(self.quat)
+            print(other.quat)
+            return self.__class__(quaternion_multiply(self.quat, other.quat))
 
         elif isinstance(other, Translation):
             return RigidTransform(self, self.apply(other.vec))
 
         elif isinstance(other, RigidTransform):
             return RigidTransform(
-                self @ other.rotation, self.apply(other.translation.vec)
+                self @ other.rotation, self.apply(other.translation.apply(np.zeros(3)))
             )
 
         else:
             return super().__matmul__(other)
 
     def __len__(self):
-        return len(self.rot)
+        if self.single:
+            raise TypeError("single transform has no len")
+
+        return len(self.quat)
 
     def __getitem__(self, item) -> Self:
         if self.single:
             raise TypeError("cannot index single transform")
 
         obj = Rotation([0, 0, 0, 1])
-        obj.rot = self.rot[item]
+        obj.quat = self.quat[item]
         obj.mat = self.mat[item]
         return obj
 
     def apply(self, x) -> np.ndarray:
         x = np.asarray(x)
-
-        return np.matmul(
-            np.expand_dims(x, -2), np.moveaxis(self.mat, -1, -2)[..., :3, :3]
-        ).squeeze(-2)
+        return np.linalg.vecdot(np.expand_dims(x, -2), self.mat)
 
     def inv(self) -> Self:
-        return Rotation(self.rot.inv().as_quat()[..., [3, 0, 1, 2]])
+        return Rotation(self.quat * [1, -1, -1, -1])
 
     @property
     def single(self) -> bool:
-        return self.rot.single
-
-    @classmethod
-    def from_attitude(cls, yaw, pitch, roll):
-        """Create rotation using aeronautical interpretation of euler angles.
-
-        The returned rotation sequentially applies yaw, pitch then roll,
-        which is sometimes expressed as a rotation along :math:`zy'x"`.
-        """
-        scipy_rot = SPRotation.from_euler("ZYX", (yaw, pitch, roll))
-        return Rotation(scipy_rot.as_quat()[..., [3, 0, 1, 2]])
+        return self.quat.ndim == 1
 
     def as_quat(self):
         """Return the quaternion representation."""
-        return self.rot.as_quat()[..., [3, 0, 1, 2]]
+        return np.copy(self.quat)
 
     @classmethod
     def from_matrix(cls, mat):
         """Create a rotation from 3x3 or 4x4 rotation matrices."""
         mat = np.asarray(mat)
 
-        if mat.shape[1] == 4 and np.abs(mat[:, 3]).max() > 1e-6:
-            raise ValueError()
-
-        return Rotation(SPRotation.from_matrix(mat[:, :3]).as_quat()[..., [3, 0, 1, 2]])
+        w = 0.5 * np.sqrt(1 + mat[..., 0, 0] + mat[..., 1, 1] + mat[..., 2, 2])
+        x = (mat[..., 2, 1] - mat[..., 1, 2]) * 0.25 / w
+        y = (mat[..., 0, 2] - mat[..., 2, 0]) * 0.25 / w
+        z = (mat[..., 1, 0] - mat[..., 0, 1]) * 0.25 / w
+        quat = np.stack([w, x, y, z], axis=-1)
+        return cls(quat)
 
     def as_matrix(self) -> np.ndarray:
         """Return the rotation as a 4x4 rotation matrix."""
@@ -432,16 +290,11 @@ class Rotation(Transformation):
         return out
 
     def as_euler(self, seq: str, degrees: bool = False):
-        """Return the rotation encoded as euler angles.
-
-        This is an alias of :meth:`scipy.spatial.transform.Rotation.as_euler`
-        """
-        return self.rot.as_euler(seq, degrees)
+        return as_euler(seq, self.quat, degrees)
 
     @classmethod
-    def from_euler(cls, seq: str, degrees: bool = False):
-        rot = SPRotation.from_euler(seq, degrees)
-        return Rotation(rot.as_quat()[..., [3, 0, 1, 2]])
+    def from_euler(cls, seq: str, angles, degrees: bool = False):
+        return cls(from_euler(seq, angles, degrees))
 
 
 class Translation(Transformation):
@@ -524,8 +377,9 @@ class RigidTransform(Transformation):
 
     @classmethod
     def interpolate(cls, p1: Self, p2: Self, w: float):
-        q = slerp(p1.rotation.as_quat(), p2.rotation.as_quat(), w)
-        t = w * p1.translation.vec + (1 - w) * p2.translation.vec
+        w = np.asarray(w)
+        q = slerp(p1.rotation.quat, p2.rotation.quat, w)
+        t = w[..., None] * p1.translation.vec + (1 - w[..., None]) * p2.translation.vec
         return cls(q, t)
 
     @property
@@ -653,52 +507,31 @@ def where_in_box(pts, size, box2sensor: Transformation):
     return np.where(inside[:, 0] & inside[:, 1] & inside[:, 2])[0]
 
 
-def test_box_in_frame(obj2img, obj_size, img_size):
-    """Return whether any of a box corner points lands within an image."""
-    pts_2d = obj2img.apply(cube_edges * obj_size)
-    in_frame = (
-        (pts_2d[:, 2] > 0)
-        & np.all(pts_2d > 0, axis=1)
-        & np.all(pts_2d[:, :2] < [img_size], axis=1)
-    )
-    return any(in_frame)
+# def test_box_in_frame(obj2img, obj_size, img_size):
+#     """Return whether any of a box corner points lands within an image."""
+#     pts_2d = obj2img.apply(cube_edges * obj_size)
+#     in_frame = (
+#         (pts_2d[:, 2] > 0)
+#         & np.all(pts_2d > 0, axis=1)
+#         & np.all(pts_2d[:, :2] < [img_size], axis=1)
+#     )
+#     return any(in_frame)
 
 
-def bbox_2d(obj2img, size, imsize):
-    """Return the 2D bounding box for a 3D box projected onto an image."""
-    size = np.asarray(size)
-    imsize = tuple(imsize)
+# def bbox_2d(obj2img, size, imsize):
+#     """Return the 2D bounding box for a 3D box projected onto an image."""
+#     size = np.asarray(size)
+#     imsize = tuple(imsize)
 
-    edges_25d = obj2img.apply(cube_edges * size[None, :])
-    zmax = max(edges_25d[:, 2])
+#     edges_25d = obj2img.apply(cube_edges * size[None, :])
+#     zmax = max(edges_25d[:, 2])
 
-    # filter in frame
-    box_25d = shapely.geometry.MultiPoint(edges_25d).convex_hull
-    visible_space = shapely.geometry.MultiPoint(
-        [(0, 0, 0), imsize + (0,), (0, 0, zmax)]
-    ).envelope
-    box_visible = box_25d.intersection(visible_space).envelope
-    edges_2d = np.array(box_visible.exterior.coords)
+#     # filter in frame
+#     box_25d = shapely.geometry.MultiPoint(edges_25d).convex_hull
+#     visible_space = shapely.geometry.MultiPoint(
+#         [(0, 0, 0), imsize + (0,), (0, 0, zmax)]
+#     ).envelope
+#     box_visible = box_25d.intersection(visible_space).envelope
+#     edges_2d = np.array(box_visible.exterior.coords)
 
-    return tuple(edges_2d.min(0)) + tuple(edges_2d.max(0))
-
-
-def approx_kitti_bbox2d(position, size, heading):
-    """Approximate 2D object height as if kitti cameras were used.
-
-    Returns fake 2D coordinates (xmin, ymin, xmax, ymax) such that
-    ymax - ymin is the estimated 2D height in pixels.
-    """
-    l, w, h = size
-
-    # find closest edge to camera
-    obj2cam = Translation(position) @ Rotation.from_euler("Y", heading)
-    edges = obj2cam.apply(
-        0.5 * np.array([[-l, -w, 0], [-l, w, 0], [l, -w, 0], [l, w, 0]])
-    )
-    dist = np.linalg.norm(edges, axis=-1).min()
-
-    # infer approximate pixel height
-    height_2d = h * 740 / dist  # approximate vertical camera intrinsic
-
-    return -1, 0, -1, height_2d
+#     return tuple(edges_2d.min(0)) + tuple(edges_2d.max(0))

@@ -11,14 +11,14 @@ requires-python = ">=3.10"
 keywords = []
 license = { text = "CECILL-C" }
 classifiers = []
-dependencies = ["numpy", "scipy>=1.6.0", "Pillow", "shapely", "pyarrow"]
+dependencies = ["numpy", "Pillow", "shapely", "pyarrow"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 plot = ["matplotlib", "k3d"]
 jupyter = ["ipykernel", "ipywidgets", "ipympl"]
 doc = ["sphinx", "nbsphinx", "furo"]
-test = ["sphinx", "nbsphinx", "furo"]
+test = ["scipy>=1.6.0", "sphinx", "nbsphinx", "furo"]
 
 [tool.setuptools]
 packages = ["tri3d"]
