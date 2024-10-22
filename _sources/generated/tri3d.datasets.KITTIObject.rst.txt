@@ -1,0 +1,7 @@
+﻿KITTIObject
+===========
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: KITTIObject
+    :inherited-members:

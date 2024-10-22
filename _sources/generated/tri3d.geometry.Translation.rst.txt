@@ -1,0 +1,7 @@
+﻿Translation
+===========
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: Translation
+    :inherited-members:

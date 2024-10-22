@@ -1,0 +1,7 @@
+﻿Waymo
+=====
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Waymo
+    :inherited-members:
