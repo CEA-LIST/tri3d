@@ -270,26 +270,39 @@ class Dataset(AbstractDataset):
         raise NotImplementedError
 
     def poses(self, seq: int, sensor: str, timeline: str | None = None):
-        if timeline is None or timeline == sensor:
-            return self._poses(seq, sensor)
+        if sensor in self.img_sensors:
+            sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
-        # use timeline sensor poses and calibration when available
-        try:
-            tim_sensor_poses = self._calibration(seq, sensor, timeline)
-        except ValueError:
-            pass
-        else:
-            return self._poses(seq, timeline) @ tim_sensor_poses
+        if timeline is None:
+            timeline = sensor
 
-        # interpolate poses to timeline timestamps
-        poses = self._raw_poses(seq)
-        poses_t = self.timestamps(seq, "pose")
+        if timeline == sensor:  # simple case
+            try:
+                return self._poses(seq, sensor)
+            except ValueError:
+                pass
+
+        else:  # use timeline sensor poses and calibration when available
+            try:
+                tim_sensor_poses = self._calibration(seq, sensor, timeline)
+                return self._poses(seq, timeline) @ tim_sensor_poses
+            except ValueError:
+                pass
+
+        # interpolate sensor poses to timeline
+        try: # use sensor poses when available
+            poses = self._poses(seq, sensor)
+            poses_t = self.timestamps(seq, sensor)
+        except ValueError: # use imu and imu->sensor calib
+            poses = self._poses(seq, "ego") @ self._calibration(seq, sensor, "ego")
+            poses_t = self.timestamps(seq, "ego")
+
         dst_t = self.timestamps(seq, timeline)
 
         i1, i2 = misc.lr_bisect(poses_t, dst_t)
         t1 = poses_t[i1]
         t2 = poses_t[i2]
-        alpha = (t2 - dst_t) / (t2 - t1).clip(min=1e-6)
+        alpha = (dst_t - t1) / (t2 - t1).clip(min=1e-6)
 
         return RigidTransform.interpolate(poses[i1], poses[i2], alpha)
 
@@ -407,7 +420,7 @@ class Dataset(AbstractDataset):
         # interpolate
         t1 = boxes_timestamps[i1]
         t2 = boxes_timestamps[i2]
-        w = (t2 - sensor_ts) / max(t2 - t1, 1e-6)  # TODO
+        w = (sensor_ts - t1) / max(t2 - t1, 1e-6)  # TODO
 
         ann2coords = RigidTransform.interpolate(
             self.alignment(seq, (i1, frame), ("boxes", coords)),

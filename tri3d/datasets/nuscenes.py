@@ -11,6 +11,7 @@ import PIL.Image
 
 from ..geometry import (
     CameraProjection,
+    Rotation,
     RigidTransform,
     Translation,
 )
@@ -64,17 +65,18 @@ class NuScenes(Dataset):
 
        Notable differences with original NuScenes data:
 
-       - Size encoded as length, width, height instead of width, length, height.
-       - Lidar pcl is rotated by -90° so x axis points forward.
+       * Size encoded as length, width, height instead of width, length, height.
+       * Lidar pcl is rotated by 90° so x axis points forward.
 
     `NuScenes website <https://www.nuscenes.org>`_
     """
-
     _default_cam_sensor = "CAM_FRONT"
     _default_pcl_sensor = "LIDAR_TOP"
     _default_box_coords = "LIDAR_TOP"
 
-    def __init__(self, root, subset, det_label_map=None, sem_label_map=None):
+    def __init__(
+        self, root, subset="v1.0-mini", det_label_map=None, sem_label_map=None
+    ):
         self.root_dir = root
         self.det_label_map = det_label_map
         self.sem_label_map = sem_label_map
@@ -323,7 +325,7 @@ class NuScenes(Dataset):
             annotation_attributes = [
                 attribute[t]["name"] for t in sample_annotation_v["attribute_tokens"]
             ]
-            w, l, h = sample_annotation_v["size"]
+            width, length, height = sample_annotation_v["size"]
             scene_boxes[scene_token].append(
                 RawAnnotation(
                     frame=frame,
@@ -333,7 +335,7 @@ class NuScenes(Dataset):
                     visibility=sample_annotation_v["visibility_token"],
                     attributes=annotation_attributes,
                     position=sample_annotation_v["translation"],
-                    size=(l, w, h),
+                    size=(length, width, height),
                     rotation=sample_annotation_v["rotation"],
                     num_lidar_pts=sample_annotation_v["num_lidar_pts"],
                     num_radar_pts=sample_annotation_v["num_radar_pts"],
@@ -353,6 +355,15 @@ class NuScenes(Dataset):
                 categories[c["index"]] = c["name"]
         else:
             categories = [c["name"] for c in category.values()]
+
+        # rotate lidars to make x point forward
+        for scene_calibs in scene_calibration.values():
+            for sensor, sensor_calibs in scene_calibs.items():
+                if sensor in self.pcl_sensors:
+                    sensor_calibs["rotation"] = (
+                        Rotation(sensor_calibs["rotation"])
+                        @ Rotation.from_euler("Z", np.pi / 2)
+                    ).as_quat()
 
         # set attributes
         self.categories = categories
@@ -409,6 +420,9 @@ class NuScenes(Dataset):
         return dst_calib.inv() @ src_calib
 
     def _poses(self, seq, sensor):
+        if sensor in self.img_sensors:
+            sensor = self.cam_sensors[self.img_sensors.index(sensor)]
+
         if sensor == "boxes":
             num_frames = len(self.scenes[seq].keyframes["LIDAR_TOP"])
             return RigidTransform.from_matrix(np.tile(np.eye(4), (num_frames, 1, 1)))
@@ -424,9 +438,11 @@ class NuScenes(Dataset):
 
     def _points(self, seq, frame, sensor):
         filename = os.path.join(
-            self.root_dir, self.scenes[seq].data["LIDAR_TOP"][frame].filename
+            self.root_dir, self.scenes[seq].data[sensor][frame].filename
         )
-        return np.fromfile(filename, dtype=np.float32).reshape(-1, 5)
+        pcl = np.fromfile(filename, dtype=np.float32).reshape(-1, 5)
+        pcl[:, 0], pcl[:, 1] = pcl[:, 1], -pcl[:, 0]
+        return pcl
 
     def _boxes(self, seq):
         out = []

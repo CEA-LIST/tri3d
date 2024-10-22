@@ -3,13 +3,17 @@ import numpy as np
 
 def from_euler(seq, angles, degrees=False):
     angles = np.asarray(angles)
+    
+    if len(seq) == 1:
+        angles = angles[..., None]
+
     if degrees:
         angles = angles / 180 * np.pi
 
     quat = np.zeros(angles.shape[:-1] + (4,))
     quat[..., 0] = 1
 
-    for i in range(3):
+    for i in range(len(seq)):
         c = np.cos(0.5 * angles[..., i])
         s = np.sin(0.5 * angles[..., i])
 

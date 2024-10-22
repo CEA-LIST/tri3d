@@ -377,9 +377,18 @@ class RigidTransform(Transformation):
 
     @classmethod
     def interpolate(cls, p1: Self, p2: Self, w: float):
+        """Linearly interpolate between two transformations.
+
+        :param p1:
+            Left transformation
+        :param p2:
+            Right transformations
+        :param w:
+            Interpolation ratio such that 0. -> p1, 1. -> p2.
+        """
         w = np.asarray(w)
         q = slerp(p1.rotation.quat, p2.rotation.quat, w)
-        t = w[..., None] * p1.translation.vec + (1 - w[..., None]) * p2.translation.vec
+        t = (1 - w[..., None]) * p1.translation.vec + w[..., None] * p2.translation.vec
         return cls(q, t)
 
     @property

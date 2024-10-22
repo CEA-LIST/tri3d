@@ -52,9 +52,7 @@ class WaymoBox(Box):
 
 
 class Waymo(Dataset):
-    """Waymo Open dataset (parquet file format).
-    
-    """
+    """Waymo Open dataset (parquet file format)."""
 
     _default_cam_sensor = "CAM_FRONT"
     _default_pcl_sensor = "LIDAR_TOP"
@@ -240,11 +238,13 @@ class Waymo(Dataset):
                 self.root / self.split / "vehicle_pose" / (record + ".parquet"),
                 columns=["[VehiclePoseComponent].world_from_vehicle.transform"],
             )
-            poses = np.concatenate(
-                data["[VehiclePoseComponent].world_from_vehicle.transform"].to_numpy(
-                    zero_copy_only=False
-                )
-            ).reshape(-1, 4, 4)
+            poses = (
+                data["[VehiclePoseComponent].world_from_vehicle.transform"]
+                .combine_chunks()
+                .flatten()
+                .to_numpy()
+                .reshape(-1, 4, 4)
+            )
             return geometry.RigidTransform.from_matrix(poses)
 
         if sensor in self.cam_sensors:
@@ -254,11 +254,13 @@ class Waymo(Dataset):
                 filters=[("key.camera_name", "=", self.cam_sensors.index(sensor) + 1)],
                 columns=["[CameraImageComponent].pose.transform"],
             )
-            poses = np.concatenate(
-                data["[CameraImageComponent].pose.transform"].to_numpy(
-                    zero_copy_only=False
-                )
-            ).reshape(-1, 4, 4)
+            poses = (
+                data["[CameraImageComponent].pose.transform"]
+                .combine_chunks()
+                .flatten()
+                .to_numpy()
+                .reshape(-1, 4, 4)
+            )
             return geometry.RigidTransform.from_matrix(poses) @ self._calibration(
                 seq, sensor, "LIDAR_TOP"
             )
@@ -453,8 +455,8 @@ class Waymo(Dataset):
             "[LiDARBoxComponent].difficulty_level.tracking"
         ].to_numpy()
 
-        transform = geometry.Translation(center) @ geometry.Rotation.from_euler(
-            "Z", heading
+        transform = geometry.RigidTransform(
+            geometry.Rotation.from_euler("Z", heading), center
         )
 
         out = []
@@ -540,17 +542,18 @@ class Waymo(Dataset):
     def semantic(self, seq: int, frame: int, sensor="LIDAR_TOP"):
         if sensor == "LIDAR_ALL":
             return np.concatenate(
-                [self.semantic(seq, frame, l) for l in self.pcl_sensors]
+                [self.semantic(seq, frame, lidar) for lidar in self.pcl_sensors]
             )
 
         return1, return2 = self._panoptic(seq, frame, sensor)
         return np.concatenate([return1[:, 1], return2[:, 1]])
 
     def instances(self, seq: int, frame: int, sensor="LIDAR_TOP"):
-        if sensor == "LIDAR_ALL":
-            return np.concatenate(
-                [self.instances(seq, frame, l) for l in self.pcl_sensors]
-            )
+        # TODO: check this
+        # if sensor == "LIDAR_ALL":
+        #     return np.concatenate(
+        #         [self.instances(seq, frame, lidar) for lidar in self.pcl_sensors]
+        #     )
 
         return1, return2 = self._panoptic(seq, frame, sensor)
         return np.concatenate([return1[:, 0], return2[:, 0]])

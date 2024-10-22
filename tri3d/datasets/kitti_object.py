@@ -1,6 +1,6 @@
 import dataclasses
-import os
 from os import path
+import pathlib
 from typing import List, Tuple
 
 import numpy as np
@@ -33,12 +33,12 @@ class KITTIObject(Dataset):
 
     .. note::
        To match tri3D conventions, box annotation are modified as follows:
- 
+
        - center is at the center of the box, not bottom
        - transform converts from tri3D object coordinates (x forward, z up)
          not kitti (x right-ward, z forward)
        - size is (length, width, height), not (height, length, width)
-    
+
     `KITTI objects website <https://www.cvlibs.net/datasets/kitti/eval_3dobject.php>`_
     """
 
@@ -62,11 +62,11 @@ class KITTIObject(Dataset):
     _default_pcl_sensor = "velo"
     _default_box_coords = "cam"
 
-    def __init__(self, data_dir, label_map=None):
+    def __init__(self, data_dir, split="training", label_map=None):
         if not path.exists(data_dir):
             raise ValueError("{} does not exist".format(data_dir))
 
-        self.root = data_dir
+        self.root = pathlib.Path(data_dir) / split
         self.label_map = {k: k for k in self.det_labels}
         if label_map is not None:
             self.label_map = {k: label_map[v] for k, v in label_map}
@@ -75,7 +75,7 @@ class KITTIObject(Dataset):
         self._calib_cache = {}
 
         self.filenames = sorted(
-            f.removesuffix(".bin") for f in os.listdir(path.join(self.root, "velodyne"))
+            f.name.removesuffix(".bin") for f in (self.root / "velodyne").iterdir()
         )
 
     def _calibration(self, seq, src_sensor, dst_sensor):
@@ -85,7 +85,7 @@ class KITTIObject(Dataset):
         if src_sensor == dst_sensor:
             return RigidTransform([1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
 
-        file = path.join(self.root, "calib", self.filenames[seq] + ".txt")
+        file = self.root / "calib" / (self.filenames[seq] + ".txt")
         calib = {}
         with open(file) as f:
             for line in f:
@@ -117,12 +117,12 @@ class KITTIObject(Dataset):
         if sensor != "velo":
             raise ValueError()
 
-        file = path.join(self.root, "velodyne", self.filenames[seq] + ".bin")
+        file = self.root / "velodyne" / f"{self.filenames[seq]}.bin"
         return np.fromfile(file, dtype=np.float32).reshape(-1, 4)
 
     def _boxes(self, seq) -> List[KITTIObjectBox]:
         data = np.loadtxt(
-            path.join(self.root, "label_2", self.filenames[seq] + ".txt"),
+            self.root / "label_2" / f"{self.filenames[seq]}.txt",
             dtype=[
                 ("type", "U64"),
                 ("truncated", "f4"),
@@ -138,9 +138,9 @@ class KITTIObject(Dataset):
         annotations = []
         for i, a in enumerate(data):
             # convert to our conventions
-            h, w, l = a["dimensions"]
+            height, width, length = a["dimensions"]
             position = a["location"]
-            position[1] -= h / 2  # center position vertically
+            position[1] -= height / 2  # center position vertically
             heading = a["rotation_y"]
             label = self.label_map[a["type"]]
 
@@ -156,7 +156,7 @@ class KITTIObject(Dataset):
                     frame=0,
                     uid=i,
                     center=obj2cam.apply([0, 0, 0]),
-                    size=np.array([l, w, h]),
+                    size=np.array([length, width, height]),
                     heading=heading,
                     transform=obj2cam,
                     label=label,
@@ -171,7 +171,7 @@ class KITTIObject(Dataset):
     def sequences(self):
         return list(range(len(self.filenames)))
 
-    def frames(self, seq=None):
+    def frames(self, seq=None, sensor=None):
         if seq is None:
             return [(i, 0) for i in range(len(self.filenames))]
         else:
@@ -181,6 +181,9 @@ class KITTIObject(Dataset):
         return np.zeros(1)
 
     def poses(self, seq, sensor, timeline=None):
+        if sensor in self.img_sensors:
+            sensor = self.cam_sensors[self.img_sensors.index(sensor)]
+
         pose = self._calibration(seq, sensor, "velo")
         return RigidTransform(pose.rotation.as_quat()[None], pose.translation.vec[None])
 

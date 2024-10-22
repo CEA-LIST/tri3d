@@ -1,18 +1,26 @@
-import itertools
 import json
 import pathlib
 from datetime import datetime
-from typing import List, Tuple, Union
+from typing import List
 
 import numpy as np
 from PIL import Image
 
-from .. import geometry, misc
+from .. import geometry
+from .. import misc
 from .dataset import Box, Dataset
 
 
 class ZODFrames(Dataset):
-    """Zenseact Open dataset."""
+    """Zenseact Open dataset.
+
+    .. note::
+       Notable differences with the original ZOD dataset:
+
+       * Lidars are rotated by 90° around Z so that x point forward of the ego car.
+       * Boxes are interpolated to all frames, use the timestamps to decide if they
+         are relevant.
+    """
 
     cam_sensors = ["front"]
     img_sensors = ["img_front"]
@@ -34,11 +42,17 @@ class ZODFrames(Dataset):
     _default_pcl_sensor = "velodyne"
     _default_box_coords = "velodyne"
 
-    def __init__(self, root, metadata, split, anon_method="dnat"):
+    def __init__(
+        self,
+        root,
+        metadata="trainval-frames-mini.json",
+        split="train",
+        anon_method="dnat",
+    ):
         self.root = pathlib.Path(root)
         self.anon_method = anon_method
 
-        with open(metadata, "rb") as f:
+        with open(self.root / metadata, "rb") as f:
             self.metadata = json.load(f)[split]
 
         self._timelines = []
@@ -63,6 +77,10 @@ class ZODFrames(Dataset):
                     [datetime.fromisoformat(f["time"]).timestamp() for f in frames]
                 )
 
+            seq_timelines["boxes"] = seq_timelines["velodyne"][
+                misc.nearest_sorted(seq_timelines["velodyne"], seq_timelines["front"])
+            ]
+
             with open(
                 self.root / "single_frames" / seq["id"] / "ego_motion.json", "rb"
             ) as f:
@@ -73,13 +91,13 @@ class ZODFrames(Dataset):
             )
 
             seq_timelines["ego"] = np.array(ego_motion["timestamps"])
+
             self._timelines.append(seq_timelines)
 
-        self._keyframes = []
         for i, seq in enumerate(self.metadata):
-            self._timelines[i]["keyframes"] = datetime.fromisoformat(
-                seq["keyframe_time"]
-            ).timestamp()
+            self._timelines[i]["keyframes"] = [
+                datetime.fromisoformat(seq["keyframe_time"]).timestamp()
+            ]
 
     def _calibration(self, seq, src_sensor, dst_sensor):
         if src_sensor == dst_sensor:
@@ -104,12 +122,14 @@ class ZODFrames(Dataset):
 
             return cam2img @ src2cam
 
-        elif src_sensor == "ego":
-            return self._calibration(seq, dst_sensor, src_sensor).inv()
-
-        elif dst_sensor != "ego":  # break into src -> ego -> dst
+        if dst_sensor != "ego":  # break into src -> ego -> dst
             return self._calibration(seq, dst_sensor, "ego").inv() @ self._calibration(
                 seq, src_sensor, "ego"
+            )
+
+        elif src_sensor == "boxes":
+            return geometry.RigidTransform.from_matrix(
+                calibration["FC"]["lidar_extrinsics"]
             )
 
         elif src_sensor == "front":
@@ -118,34 +138,22 @@ class ZODFrames(Dataset):
         elif src_sensor == "velodyne":
             return geometry.RigidTransform.from_matrix(
                 calibration["FC"]["lidar_extrinsics"]
-            )
+            ) @ geometry.Rotation.from_euler("Z", np.pi / 2)
 
         else:
             raise ValueError()
 
     def _poses(self, seq, sensor):
-        if sensor == "velodyne" or sensor == "boxes":
+        if sensor == "ego":
             return self._ego_poses[seq]
 
-        # interp to timestamps
-        ego2world = self._ego_poses[seq]
-        ego_ts = self._timelines[seq]["ego"]
-        sensor2ego = self._calibration(seq, sensor, "velodyne")
-        sensor_ts = self._timelines[seq][sensor]
-
-        i1, i2 = misc.lr_bisect(ego_ts, sensor_ts)
-        t1 = ego_ts[i1]
-        t2 = ego_ts[i2]
-        alpha = (t2 - sensor_ts) / (t2 - t1).clip(min=1e-6)
-        return (
-            geometry.RigidTransform.interpolate(ego2world[i1], ego2world[i2], alpha)
-            @ sensor2ego
-        )
+        else:
+            raise ValueError("use imu pose to infer sensor poses.")
 
     def _points(self, seq, frame, sensor):
         filepath = self.metadata[seq]["lidar_frames"][sensor][frame]["filepath"]
         points = np.load(self.root / filepath)
-        xyz = np.stack([points["x"], points["y"], points["z"]], axis=-1)
+        xyz = np.stack([points["y"], -points["x"], points["z"]], axis=-1)
         return xyz
 
     def _boxes(self, seq):
@@ -187,7 +195,7 @@ class ZODFrames(Dataset):
 
             out.append(
                 Box(
-                    frame=10,
+                    frame=0,
                     uid=uuid,
                     center=transform.apply([0, 0, 0]),
                     size=size,
@@ -201,15 +209,12 @@ class ZODFrames(Dataset):
 
     def sequences(self) -> List[int]:
         """Return the list of sequences/recordings indices (0..num_sequences)."""
-        return list(range(len(self.meta)))
+        return list(range(len(self.metadata)))
 
     def timestamps(self, seq, sensor):
-        if sensor == "boxes":
-            sensor = "velodyne"
-
         return self._timelines[seq][sensor]
 
-    def image(self, seq: int, frame: int = 0, sensor: str = "front") -> Image:
-        sensor = sensor + "_" + self.anon_method
+    def image(self, seq: int, frame: int = 0, sensor: str = "img_front") -> Image:
+        sensor = sensor.removeprefix("img_") + "_" + self.anon_method
         filepath = self.metadata[seq]["camera_frames"][sensor][frame]["filepath"]
         return Image.open(self.root / filepath)

@@ -24,4 +24,4 @@ test = ["scipy>=1.6.0", "sphinx", "nbsphinx", "furo"]
 packages = ["tri3d"]
 
 [tool.coverage.report]
-exclude_lines = ["@abstractmethod", "__repr__"]
+exclude_lines = ["@abstractmethod", "raise NotImplementedError", "__repr__"]

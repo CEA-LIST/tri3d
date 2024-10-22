@@ -116,7 +116,7 @@ def lr_bisect(a, x):
     a = np.asarray(a)
 
     i1 = np.searchsorted(a, x, side="right") - 1
-    i1 = i1.clip(min=0, max=len(a) - 2)
+    i1 = i1.clip(min=0, max=max(0, len(a) - 2))
     i2 = (i1 + 1).clip(max=len(a) - 1)
 
     return i1, i2
