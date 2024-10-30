@@ -8,16 +8,20 @@ def project_pinhole(
     cx: float,
     cy: float,
     k1: float = 0.0,
+    k2: float = 0.0,
     p1: float = 0.0,
     p2: float = 0.0,
+    k3: float = 0.0,
 ):
     z = xyz[..., 2]
     x = np.sign(z) * xyz[..., 0] / z
     y = np.sign(z) * xyz[..., 1] / z
 
     r2 = np.square(x) + np.square(y)
+    r4 = np.square(r2)
+    r6 = r2 * r4
 
-    radial_factor = 1 + k1 * r2
+    radial_factor = 1 + k1 * r2 + k2 * r4 + k3 * r6
     x_ = x * radial_factor + 2 * p1 * x * y + p2 * (r2 + 2 * x**2)
     y_ = y * radial_factor + p1 * (r2 + 2 * y**2) + 2 * p2 * x * y
 

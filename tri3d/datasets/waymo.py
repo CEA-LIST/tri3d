@@ -183,11 +183,13 @@ class Waymo(Dataset):
                 ],
             )
             calib = camera_calibration.to_pylist()[0]
-            intrinsics = [
+            fx, fy, cx, cy, k1, p1, p2 = [
                 calib["[CameraCalibrationComponent].intrinsic." + field]
                 for field in ["f_u", "f_v", "c_u", "c_v", "k1", "p1", "p2"]
             ]
-            cam2img = geometry.CameraProjection("pinhole", intrinsics)
+            cam2img = geometry.CameraProjection(
+                "pinhole", (fx, fy, cx, cy, k1, 0.0, p1, p2)
+            )
 
             cam_sensor = self.cam_sensors[self.img_sensors.index(dst_sensor)]
             src2cam = self._calibration(seq, src_sensor, cam_sensor)

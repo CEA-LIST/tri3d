@@ -1,11 +1,11 @@
 import pathlib
 
 import numpy as np
-from tri3d.datasets import AbstractDataset, KITTIObject, NuScenes, Waymo, ZODFrames
+from tri3d.datasets import AbstractDataset, KITTIObject, NuScenes, Once, Waymo, ZODFrames
 import pytest
 
 
-@pytest.fixture(scope="module", params=[KITTIObject, NuScenes, Waymo, ZODFrames])
+@pytest.fixture(scope="module", params=[KITTIObject, NuScenes, Once, Waymo, ZODFrames])
 def dataset(request) -> AbstractDataset:
     cls = request.param
     return cls(pathlib.Path(__file__).parent.parent / "datasets" / cls.__name__.lower())
