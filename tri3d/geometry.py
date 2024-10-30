@@ -133,7 +133,7 @@ class Pipeline(Transformation):
         if self.single:
             raise TypeError("cannot index single transform")
 
-        return self.__class__(
+        return Pipeline(
             *[op if op.single else op[item] for op in self.operations]
         )
 
@@ -178,7 +178,7 @@ class AffineTransform(Transformation):
         if self.single:
             raise TypeError("cannot index single transform")
 
-        return self.__class__(self.mat[item])
+        return AffineTransform(self.mat[item])
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, AffineTransform):
@@ -190,7 +190,7 @@ class AffineTransform(Transformation):
             else:
                 other_mat = np.broadcast_to(other_mat, mat.shape)
 
-            return self.__class__(mat @ other_mat)
+            return AffineTransform(mat @ other_mat)
 
         else:
             return super().__matmul__(other)
@@ -204,7 +204,7 @@ class AffineTransform(Transformation):
         )
 
     def inv(self) -> Self:
-        return self.__class__(np.linalg.inv(self.mat))
+        return AffineTransform(np.linalg.inv(self.mat))
 
 
 class Rotation(Transformation):
@@ -224,7 +224,7 @@ class Rotation(Transformation):
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, Rotation):
-            return self.__class__(quaternion_multiply(self.quat, other.quat))
+            return Rotation(quaternion_multiply(self.quat, other.quat))
 
         elif isinstance(other, Translation):
             return RigidTransform(self, self.apply(other.vec))
@@ -247,7 +247,7 @@ class Rotation(Transformation):
         if self.single:
             raise TypeError("cannot index single transform")
 
-        obj = Rotation([0, 0, 0, 1])
+        obj = Rotation.__new__(Rotation)
         obj.quat = self.quat[item]
         obj.mat = self.mat[item]
         return obj
@@ -321,11 +321,11 @@ class Translation(Transformation):
         if self.single:
             raise TypeError("Single Translation has no len.")
 
-        return self.__class__(self.vec.reshape((-1, 3))[item])
+        return Translation(self.vec[item])
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, Translation):
-            return self.__class__(self.vec + other.vec)
+            return Translation(self.vec + other.vec)
         elif isinstance(other, RigidTransform):
             return RigidTransform(other.rotation, other.translation.vec + self.vec)
         elif isinstance(other, Rotation):
@@ -334,20 +334,20 @@ class Translation(Transformation):
             return super().__matmul__(other)
 
     def __add__(self, other):
-        return self.__class__(self.vec + other.vec)
+        return Translation(self.vec + other.vec)
 
     def __neg__(self):
-        return self.__class__(-self.vec)
+        return Translation(-self.vec)
 
     def __sub__(self, other):
-        return self.__class__(self.vec - other.vec)
+        return Translation(self.vec - other.vec)
 
     def apply(self, x) -> np.ndarray:
         x = np.asarray(x)
         return np.add(x, self.vec, dtype=x.dtype)
 
     def inv(self) -> Self:
-        return self.__class__(-self.vec)
+        return Translation(-self.vec)
 
 
 class RigidTransform(Transformation):
@@ -422,13 +422,13 @@ class RigidTransform(Transformation):
         if self.single:
             raise TypeError("Single RigidTranform has no len.")
 
-        return self.__class__(
+        return RigidTransform(
             self.rotation if self.rotation.single else self.rotation[item],
             self.translation if self.translation.single else self.translation[item],
         )
 
     def __iter__(self):
-        return itertools.starmap(self.__class__, zip(self.rotation, self.translation))
+        return itertools.starmap(RigidTransform, zip(self.rotation, self.translation))
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, Translation):
@@ -491,7 +491,7 @@ class CameraProjection(Transformation):
         raise NotImplementedError
 
 
-def where_in_box(pts, size, box2sensor: Transformation):
+def where_in_box(pts, size, box2sensor: Transformation) -> np.ndarray:
     """Return the points that lie inside a bounding box.
 
     :param pts: N by 3 array of point coordinates
@@ -514,7 +514,7 @@ def where_in_box(pts, size, box2sensor: Transformation):
     return np.where(inside[:, 0] & inside[:, 1] & inside[:, 2])[0]
 
 
-def test_box_in_frame(obj2img, obj_size, img_size):
+def test_box_in_frame(obj2img: Transformation, obj_size, img_size) -> bool:
     """Return whether any of a box corner points lands within an image."""
     pts_2d = obj2img.apply(cube_edges * obj_size)
     in_frame = (

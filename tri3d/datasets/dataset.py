@@ -149,6 +149,13 @@ class AbstractDataset(ABC):
 
         A default sensor (for instance a front facing camera) should be
         provided for convenience.
+
+        :param seq:
+            Sequence index.
+        :param frame:
+            Frame index.
+        :param sensor:
+            The image sensor to use.
         """
         raise NotImplementedError
 
@@ -160,6 +167,23 @@ class AbstractDataset(ABC):
 
         The first three columns contains xyz coordinates, additional columns
         are dataset-specific.
+
+        For convenience, the point cloud can be returned in the coordinate
+        system of another sensor. In that case, `frame` is understood as the
+        frame for that sensor and the point cloud which has the nearest 
+        timestamp is retrieved and aligned.
+
+        :param seq:
+            Sequence index.
+        :param frame:
+            Frame index.
+        :param sensor:
+            The 3D sensor (generally a LiDAR) to use.
+        :param coords:
+            The coordinate system and timeline to use. Defaults to the sensor.
+        :return:
+            A NxD array where the first 3 columns are X, Y, Z point coordinates
+            and the remaining ones are dataset-specific.
         """
         raise NotImplementedError
 

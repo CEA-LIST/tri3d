@@ -12,12 +12,12 @@ from .dataset import Box, Dataset
 
 
 class ZODFrames(Dataset):
-    """Zenseact Open dataset.
+    """`ZOD Frames <https://zod.zenseact.com/frames/>`_ (Zenseact Open Dataset).
 
     .. note::
        Notable differences with the original ZOD dataset:
 
-       * Lidars are rotated by 90° around Z so that x point forward of the ego car.
+       * Lidars are rotated by 90° around Z so that x points forward of the ego car.
        * Boxes are interpolated to all frames, use the timestamps to decide if they
          are relevant.
     """
@@ -148,7 +148,7 @@ class ZODFrames(Dataset):
             return self._ego_poses[seq]
 
         else:
-            raise ValueError("use imu pose to infer sensor poses.")
+            raise ValueError("Use imu pose to infer sensor poses.")
 
     def _points(self, seq, frame, sensor):
         filepath = self.metadata[seq]["lidar_frames"][sensor][frame]["filepath"]
