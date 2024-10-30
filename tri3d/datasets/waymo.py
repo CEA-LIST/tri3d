@@ -52,7 +52,12 @@ class WaymoBox(Box):
 
 
 class Waymo(Dataset):
-    """Waymo Open dataset (parquet file format)."""
+    """`Waymo Open dataset <https://www.waymo.com/open>`_ (parquet file format).
+
+    .. note::
+       LiDAR timestamps are increased by a +0.05 so that they correspond to the
+       middle of the sweep instead of the beginning.
+    """
 
     _default_cam_sensor = "CAM_FRONT"
     _default_pcl_sensor = "LIDAR_TOP"
@@ -137,6 +142,7 @@ class Waymo(Dataset):
                         columns=["key.frame_timestamp_micros"],
                     )["key.frame_timestamp_micros"].to_numpy()
                     / 1e6
+                    + 0.05
                 )
 
                 record_timelines["SEG_" + sensor] = (
@@ -149,6 +155,7 @@ class Waymo(Dataset):
                         columns=["key.frame_timestamp_micros"],
                     )["key.frame_timestamp_micros"].to_numpy()
                     / 1e6
+                    + 0.05
                 )
 
             for i, c in enumerate(self.cam_sensors, start=1):
@@ -271,7 +278,7 @@ class Waymo(Dataset):
 
     def _lidar_returns(self, seq, frame, sensor="LIDAR_TOP"):
         record = self.records[seq]
-        timestamp = self.timelines[seq][sensor][frame]
+        timestamp = self.timelines[seq][sensor][frame] - 0.05  # sweep middle -> start
         laser_name = 1 + self.pcl_sensors.index(sensor)
 
         lidar = pq.read_table(
@@ -298,7 +305,7 @@ class Waymo(Dataset):
 
     def _points(self, seq, frame, sensor):
         record = self.records[seq]
-        timestamp = int(self.timelines[seq][sensor][frame] * 1e6)
+        timestamp = self.timelines[seq][sensor][frame] - 0.05  # sweep middle -> start
         laser_name = 1 + self.pcl_sensors.index(sensor)
 
         # Laser data
@@ -361,7 +368,7 @@ class Waymo(Dataset):
         if sensor == "LIDAR_TOP":
             lidar_pose = pq.read_table(
                 self.root / self.split / "lidar_pose" / (record + ".parquet"),
-                filters=[("key.frame_timestamp_micros", "=", timestamp)],
+                filters=[("key.frame_timestamp_micros", "=", int(timestamp * 1e6))],
             )
             shape = lidar_pose["[LiDARPoseComponent].range_image_return1.shape"][
                 0
@@ -501,14 +508,16 @@ class Waymo(Dataset):
         provided for convenience.
         """
         record = self.records[seq]
-        frame_timestamp = int(self.timelines[seq]["LIDAR_TOP"][frame] * 1e6)
+        frame_timestamp = (
+            self.timelines[seq]["LIDAR_TOP"][frame] - 0.05
+        )  # sweep middle -> start
         camera_name = 1 + self.cam_sensors.index(sensor.replace("IMG", "CAM"))
 
         data = pq.read_table(
             self.root / self.split / "camera_image" / (record + ".parquet"),
             filters=[
                 ("key.camera_name", "=", camera_name),
-                ("key.frame_timestamp_micros", "=", frame_timestamp),
+                ("key.frame_timestamp_micros", "=", int(frame_timestamp * 1e6)),
             ],
         )
 
