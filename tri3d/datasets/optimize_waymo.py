@@ -3,9 +3,12 @@
 import argparse
 import os
 from concurrent.futures import ProcessPoolExecutor
+import gc
 
 import pyarrow
+import pyarrow.dataset
 import pyarrow.parquet as pq
+import pyarrow.compute as pc
 
 
 sorting_columns = {
@@ -44,13 +47,13 @@ sorting_columns = {
 # Compress text and range image columns
 compressed_columns = [
     "[CameraSegmentationLabelComponent].sequence_id",
-    "[LiDARCameraProjectionComponent].range_image_return1.values.list.element",
-    "[LiDARCameraProjectionComponent].range_image_return2.values.list.element",
-    "[LiDARComponent].range_image_return1.values.list.element",
-    "[LiDARComponent].range_image_return2.values.list.element",
-    "[LiDARPoseComponent].range_image_return1.values.list.element",
-    "[LiDARSegmentationLabelComponent].range_image_return1.values.list.element",
-    "[LiDARSegmentationLabelComponent].range_image_return2.values.list.element",
+    "[LiDARCameraProjectionComponent].range_image_return1.values",
+    "[LiDARCameraProjectionComponent].range_image_return2.values",
+    "[LiDARComponent].range_image_return1.values",
+    "[LiDARComponent].range_image_return2.values",
+    "[LiDARPoseComponent].range_image_return1.values",
+    "[LiDARSegmentationLabelComponent].range_image_return1.values",
+    "[LiDARSegmentationLabelComponent].range_image_return2.values",
     "[StatsComponent].location",
     "[StatsComponent].time_of_day",
     "[StatsComponent].weather",
@@ -62,6 +65,9 @@ compressed_columns = [
 
 
 def convert_file(task):
+    pyarrow.set_cpu_count(4)
+    pyarrow.jemalloc_set_decay_ms(0)
+
     source, destination = task
     print(source)
     destdir = os.path.dirname(destination)
@@ -70,23 +76,32 @@ def convert_file(task):
 
     record_type = os.path.basename(os.path.dirname(source))
 
-    parquet_file = pq.ParquetFile(source)
-    table = parquet_file.read(use_threads=False)
-    table = table.sort_by([(c, "ascending") for c in sorting_columns[record_type]])
+    ds = pyarrow.dataset.dataset(source)
+    order = pc.sort_indices(
+        ds.to_table(sorting_columns[record_type]),
+        sort_keys=[(c, "ascending") for c in sorting_columns[record_type]],
+    ).to_numpy()
 
-    columns = [c.path.replace(".item", ".element") for c in parquet_file.schema]
+    table = pyarrow.dataset.dataset(source).take(order)
+
+    gc.collect()
+    pyarrow.default_memory_pool().release_unused()
 
     pq.write_table(
         table,
         destination,
         row_group_size=(
-            4 if record_type in ["lidar", "camera_image", "lidar_pose"] else 1024
+            2 if record_type in ["lidar", "camera_image", "lidar_pose"] else 1024
         ),
         compression={
-            c: "BROTLI" if c in compressed_columns else "NONE" for c in columns
+            c + (".list.element" if c.endswith(".values") else ""): "BROTLI"
+            if c in compressed_columns
+            else "NONE"
+            for c in table.schema.names
         },
         sorting_columns=[
-            pq.SortingColumn(columns.index(c)) for c in sorting_columns[record_type]
+            pq.SortingColumn(table.schema.names.index(c))
+            for c in sorting_columns[record_type]
         ],
     )
 
@@ -94,8 +109,6 @@ def convert_file(task):
 def list_files(input, output):
     for split in os.listdir(input):
         for record in os.listdir(os.path.join(input, split)):
-            if record != "lidar_pose":
-                continue
             for filename in os.listdir(os.path.join(input, split, record)):
                 if filename.endswith(".parquet"):
                     yield (
@@ -106,15 +119,15 @@ def list_files(input, output):
 
 def main():
     argparser = argparse.ArgumentParser(description=__doc__)
-    argparser.add_argument("--input", help="path to the original dataset")
-    argparser.add_argument("--output", help="path to the converted dataset")
+    argparser.add_argument("input", help="path to the original dataset")
+    argparser.add_argument("output", help="path to the converted dataset")
     argparser.add_argument(
         "--workers", "-w", type=int, default=4, help="number of parallel workers"
     )
     args = argparser.parse_args()
 
     with ProcessPoolExecutor(
-        max_workers=args.workers, initializer=lambda: pyarrow.set_cpu_count(1)
+        max_workers=args.workers, max_tasks_per_child=1
     ) as executor:
         list(executor.map(convert_file, list_files(args.input, args.output)))
 

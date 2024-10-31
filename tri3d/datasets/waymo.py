@@ -140,7 +140,7 @@ class Waymo(Dataset):
                         self.root / self.split / "lidar" / (r + ".parquet"),
                         filters=[("key.laser_name", "=", i)],
                         columns=["key.frame_timestamp_micros"],
-                    )["key.frame_timestamp_micros"].to_numpy()
+                    )["key.frame_timestamp_micros"].sort().to_numpy()
                     / 1e6
                     + 0.05
                 )
@@ -153,7 +153,7 @@ class Waymo(Dataset):
                         / (r + ".parquet"),
                         filters=[("key.laser_name", "=", i)],
                         columns=["key.frame_timestamp_micros"],
-                    )["key.frame_timestamp_micros"].to_numpy()
+                    )["key.frame_timestamp_micros"].sort().to_numpy()
                     / 1e6
                     + 0.05
                 )
@@ -163,7 +163,7 @@ class Waymo(Dataset):
                     self.root / self.split / "camera_image" / (r + ".parquet"),
                     filters=[("key.camera_name", "=", i)],
                     columns=["[CameraImageComponent].pose_timestamp"],
-                )["[CameraImageComponent].pose_timestamp"].to_numpy()
+                )["[CameraImageComponent].pose_timestamp"].sort().to_numpy()
 
             record_timelines["boxes"] = record_timelines["LIDAR_TOP"]
 
@@ -405,7 +405,7 @@ class Waymo(Dataset):
         )
 
         keyframe_ts = self.timelines[seq]["boxes"]
-        box_ts = lidar_box["key.frame_timestamp_micros"].to_numpy() / 1e6
+        box_ts = lidar_box["key.frame_timestamp_micros"].to_numpy() / 1e6 + 0.05
         box_frames = np.searchsorted(keyframe_ts, box_ts, side="left")
 
         laser_object_id = lidar_box["key.laser_object_id"].to_numpy()
