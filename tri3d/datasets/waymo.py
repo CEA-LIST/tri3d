@@ -57,6 +57,17 @@ class Waymo(Dataset):
     .. note::
        LiDAR timestamps are increased by a +0.05 so that they correspond to the
        middle of the sweep instead of the beginning.
+
+    The timestamps for cameras refer to the pose timestamp in raw waymo data.
+    Other temporal information such as trigger timestamps are not exposed.
+
+    :ref:`instances2d` returns global ids[1]_ which are consistent between 
+    frames. They are not common with the tracking and 3D annotations.
+
+    :meth:`Waymo.frames` supports an extra sensor name `'SEG_LIDAR_TOP'` where
+    it returns lidar frames for which 3D segmentation is available.
+
+    .. [1] https://github.com/waymo-research/waymo-open-dataset/blob/5f8a1cd42491210e7de629b6f8fc09b65e0cbe99/src/waymo_open_dataset/dataset.proto#L285
     """
 
     _default_cam_sensor = "CAM_FRONT"
@@ -120,6 +131,37 @@ class Waymo(Dataset):
         "WALKABLE",
         "SIDEWALK",
     ]
+    sem2d_labels = [
+        "UNDEFINED",
+        "EGO_VEHICLE",
+        "CAR",
+        "TRUCK",
+        "BUS",
+        "OTHER_LARGE_VEHICLE",
+        "BICYCLE",
+        "MOTORCYCLE",
+        "TRAILER",
+        "PEDESTRIAN",
+        "CYCLIST",
+        "MOTORCYCLIST",
+        "BIRD",
+        "GROUND_ANIMAL",
+        "CONSTRUCTION_CONE_POLE",
+        "POLE",
+        "PEDESTRIAN_OBJECT",
+        "SIGN",
+        "TRAFFIC_LIGHT",
+        "BUILDING",
+        "ROAD",
+        "LANE_MARKER",
+        "ROAD_MARKER",
+        "SIDEWALK",
+        "VEGETATION",
+        "SKY",
+        "GROUND",
+        "DYNAMIC",
+        "STATIC",
+    ]
 
     def __init__(self, root, split="training") -> None:
         self.root = pathlib.Path(root)
@@ -140,7 +182,9 @@ class Waymo(Dataset):
                         self.root / self.split / "lidar" / (r + ".parquet"),
                         filters=[("key.laser_name", "=", i)],
                         columns=["key.frame_timestamp_micros"],
-                    )["key.frame_timestamp_micros"].sort().to_numpy()
+                    )["key.frame_timestamp_micros"]
+                    .sort()
+                    .to_numpy()
                     / 1e6
                     + 0.05
                 )
@@ -153,17 +197,39 @@ class Waymo(Dataset):
                         / (r + ".parquet"),
                         filters=[("key.laser_name", "=", i)],
                         columns=["key.frame_timestamp_micros"],
-                    )["key.frame_timestamp_micros"].sort().to_numpy()
+                    )["key.frame_timestamp_micros"]
+                    .sort()
+                    .to_numpy()
                     / 1e6
                     + 0.05
                 )
 
             for i, c in enumerate(self.cam_sensors, start=1):
-                record_timelines[c] = pq.read_table(
-                    self.root / self.split / "camera_image" / (r + ".parquet"),
-                    filters=[("key.camera_name", "=", i)],
-                    columns=["[CameraImageComponent].pose_timestamp"],
-                )["[CameraImageComponent].pose_timestamp"].sort().to_numpy()
+                record_timelines[c] = (
+                    pq.read_table(
+                        self.root / self.split / "camera_image" / (r + ".parquet"),
+                        filters=[("key.camera_name", "=", i)],
+                        columns=["[CameraImageComponent].pose_timestamp"],
+                    )["[CameraImageComponent].pose_timestamp"]
+                    .sort()
+                    .to_numpy()
+                )
+
+                record_timelines[c.replace("CAM_", "IMG_")] = record_timelines[c]
+
+                record_timelines["SEG_" + c.replace("CAM_", "IMG_")] = (
+                    pq.read_table(
+                        self.root
+                        / self.split
+                        / "camera_segmentation"
+                        / (r + ".parquet"),
+                        filters=[("key.camera_name", "=", 1)],
+                        columns=["key.frame_timestamp_micros"],
+                    )["key.frame_timestamp_micros"]
+                    .sort()
+                    .to_numpy()
+                    / 1e6
+                )
 
             record_timelines["boxes"] = record_timelines["LIDAR_TOP"]
 
@@ -508,16 +574,14 @@ class Waymo(Dataset):
         provided for convenience.
         """
         record = self.records[seq]
-        frame_timestamp = (
-            self.timelines[seq]["LIDAR_TOP"][frame] - 0.05
-        )  # sweep middle -> start
+        pose_timestamp = self.timelines[seq][sensor][frame]
         camera_name = 1 + self.cam_sensors.index(sensor.replace("IMG", "CAM"))
 
         data = pq.read_table(
             self.root / self.split / "camera_image" / (record + ".parquet"),
             filters=[
                 ("key.camera_name", "=", camera_name),
-                ("key.frame_timestamp_micros", "=", int(frame_timestamp * 1e6)),
+                ("[CameraImageComponent].pose_timestamp", "=", pose_timestamp),
             ],
         )
 
@@ -527,14 +591,18 @@ class Waymo(Dataset):
 
     def _panoptic(self, seq: int, frame: int, sensor="LIDAR_TOP"):
         record = self.records[seq]
-        timestamp = int(self.timelines[seq][sensor][frame] * 1e6)
+        timestamp = self.timelines[seq][sensor][frame] - 0.05
+        laser_name = self.pcl_sensors.index(sensor) + 1
 
         return1, return2 = self._lidar_returns(seq, frame, sensor)
         h, w, _ = return1.shape
 
         segmentation = pq.read_table(
             self.root / self.split / "lidar_segmentation" / (record + ".parquet"),
-            filters=[("key.frame_timestamp_micros", "=", timestamp)],
+            filters=[
+                ("key.frame_timestamp_micros", "=", int(timestamp * 1e6)),
+                ("key.laser_name", "=", laser_name),
+            ],
         )
 
         segmentation1 = (
@@ -551,29 +619,58 @@ class Waymo(Dataset):
         return segmentation1[return1[:, :, 0] > 0], segmentation2[return2[:, :, 0] > 0]
 
     def semantic(self, seq: int, frame: int, sensor="LIDAR_TOP"):
-        if sensor == "LIDAR_ALL":
-            return np.concatenate(
-                [self.semantic(seq, frame, lidar) for lidar in self.pcl_sensors]
-            )
-
         return1, return2 = self._panoptic(seq, frame, sensor)
         return np.concatenate([return1[:, 1], return2[:, 1]])
 
     def instances(self, seq: int, frame: int, sensor="LIDAR_TOP"):
-        # TODO: check this
-        # if sensor == "LIDAR_ALL":
-        #     return np.concatenate(
-        #         [self.instances(seq, frame, lidar) for lidar in self.pcl_sensors]
-        #     )
-
         return1, return2 = self._panoptic(seq, frame, sensor)
         return np.concatenate([return1[:, 0], return2[:, 0]])
+
+    def _panoptic2d(self, seq: int, frame: int, sensor="IMG_FRONT"):
+        record = self.records[seq]
+        timestamp = self.timelines[seq]["LIDAR_TOP"][frame] - 0.05  # frame timestamp
+        camera_name = self.img_sensors.index(sensor.replace("CAM_", "IMG_")) + 1
+
+        camera_segmentation = pq.read_table(
+            self.root / self.split / "camera_segmentation" / (record + ".parquet"),
+            filters=[
+                ("key.frame_timestamp_micros", "=", int(timestamp * 1e6)),
+                ("key.camera_name", "=", camera_name),
+            ],
+        )
+
+        divisor = camera_segmentation[
+            "[CameraSegmentationLabelComponent].panoptic_label_divisor"
+        ][0].as_py()
+        instance2uid = camera_segmentation[
+            "[CameraSegmentationLabelComponent].instance_id_to_global_id_mapping.global_instance_ids"
+        ][0].as_py()
+        instance2uid = np.array([-1] + instance2uid)
+
+        ca = camera_segmentation[
+            "[CameraSegmentationLabelComponent].panoptic_label"
+        ].combine_chunks()[0]
+        f = io.BytesIO(ca.as_buffer())
+        data = np.asarray(Image.open(f))
+
+        segmentation = data // divisor
+        instances = instance2uid[data % divisor]
+
+        return segmentation, instances
+
+    def semantic2d(self, seq: int, frame: int, sensor="IMG_FRONT"):
+        segmentation, _ = self._panoptic2d(seq, frame, sensor)
+        return segmentation
+
+    def instances2d(self, seq: int, frame: int, sensor="IMG_FRONT"):
+        _, instances = self._panoptic2d(seq, frame, sensor)
+        return instances
 
     def frames(self, seq=None, sensor=None):
         if sensor.startswith("SEG_"):
             seg_ts = self.timestamps(seq, sensor)
-            pcl_ts = self.timestamps(seq, sensor.removeprefix("SEG_"))
-            frames = np.searchsorted(pcl_ts, seg_ts, side="left")
+            sensor_ts = self.timestamps(seq, sensor.removeprefix("SEG_"))
+            frames = np.searchsorted(sensor_ts, seg_ts, side="left")
             return [(seq, f) for f in frames.tolist()]
 
         else:

@@ -108,9 +108,9 @@ class AbstractDataset(ABC):
         all datasets provide an actual global coordinate system.
 
         :param seq:
-            sequence
+            Sequence index.
         :param sensor:
-            sensor name
+            Sensor name.
         :param timeline:
             When specified, the sensor poses will be interpolated to the
             timestamps of that timeline if necessary.
@@ -129,7 +129,7 @@ class AbstractDataset(ABC):
         """Return the transformation from one coordinate system and timestamp to another.
 
         :param seq:
-            The sequence index
+            Sequence index.
         :param frame:
             Either a single frame or a (src, dst) tuple. The frame is respective
             to the sensor timeline as specified by `coords`.
@@ -170,7 +170,7 @@ class AbstractDataset(ABC):
 
         For convenience, the point cloud can be returned in the coordinate
         system of another sensor. In that case, `frame` is understood as the
-        frame for that sensor and the point cloud which has the nearest 
+        frame for that sensor and the point cloud which has the nearest
         timestamp is retrieved and aligned.
 
         :param seq:
@@ -212,22 +212,37 @@ class AbstractDataset(ABC):
         .. note:: The default coordinate system should be documented.
 
         :param seq:
-            sequence
+            Sequence index.
         :param frame:
-            frame or `None` to request annotations for the whole sequence
+            Frame index or `None` to request annotations for the whole sequence
         :return:
             A list of 2D annotations.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def semantic(self, seq: int, frame: int):
+    def semantic(self, seq: int, frame: int, sensor: str):
         """Return pointwise class annotations.
 
         :param seq:
-            sequence
+            Sequence index.
         :param frame:
-            frame
+            Frame index.
+        :param sensor:
+            The camera sensor for which annotations are returned.
+        :return:
+            array of pointwise class label
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def semantic2d(self, seq: int, frame: int):
+        """Return pixelwise class annotations.
+
+        :param seq:
+            Sequence index.
+        :param frame:
+            Frame index.
         :return:
             array of pointwise class label
         """
@@ -235,12 +250,28 @@ class AbstractDataset(ABC):
 
     @abstractmethod
     def instances(self, seq: int, frame: int):
-        """Return pointwise instance annotations.
+        """Return pointwise instance ids.
 
         :param seq:
-            sequence
+            Sequence index.
         :param frame:
-            frame
+            Frame index.
+        :return:
+            array of pointwise instance label
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def instances2d(self, seq: int, frame: int):
+        """Return pixelwise instance annotations.
+
+        Background label pixels will contain -1. Other instance ids will follow
+        dataset-specific rules. 
+
+        :param seq:
+            Sequence index.
+        :param frame:
+            Frame index.
         :return:
             array of pointwise instance label
         """
@@ -314,10 +345,10 @@ class Dataset(AbstractDataset):
                 pass
 
         # interpolate sensor poses to timeline
-        try: # use sensor poses when available
+        try:  # use sensor poses when available
             poses = self._poses(seq, sensor)
             poses_t = self.timestamps(seq, sensor)
-        except ValueError: # use imu and imu->sensor calib
+        except ValueError:  # use imu and imu->sensor calib
             poses = self._poses(seq, "ego") @ self._calibration(seq, sensor, "ego")
             poses_t = self.timestamps(seq, "ego")
 
@@ -474,5 +505,11 @@ class Dataset(AbstractDataset):
     def semantic(self, seq: int, frame: int):
         raise NotImplementedError
 
+    def semantic2d(self, seq: int, frame: int):
+        raise NotImplementedError
+
     def instances(self, seq: int, frame: int):
+        raise NotImplementedError
+
+    def instances2d(self, seq: int, frame: int):
         raise NotImplementedError
