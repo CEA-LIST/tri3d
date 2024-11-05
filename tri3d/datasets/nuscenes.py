@@ -59,7 +59,7 @@ class NuScenesBox(Box):
 
 
 class NuScenes(Dataset):
-    """NuScene dataset
+    """`NuScenes <https://www.nuscenes.org>`_ dataset.
 
     .. note::
 
@@ -67,9 +67,13 @@ class NuScenes(Dataset):
 
        * Size encoded as length, width, height instead of width, length, height.
        * Lidar pcl is rotated by 90° so x axis points forward.
+       * Annotations are automatically interpolated between keyframes.
 
-    `NuScenes website <https://www.nuscenes.org>`_
+    The :meth:`keyframes` method returns the indices of the keyframes for each 
+    sensor. Keyframes aggregate a sample for each sensor around a timestamps
+    at around 2Hz.
     """
+
     _default_cam_sensor = "CAM_FRONT"
     _default_pcl_sensor = "LIDAR_TOP"
     _default_box_coords = "LIDAR_TOP"
@@ -140,7 +144,7 @@ class NuScenes(Dataset):
 
         # extract label names
         self.det_labels = [c["name"] for c in category.values()]
-        # TODO: sem_labels
+        self.sem_labels = self.det_labels
 
         # group samples by scenes
         scene_samples = {scene_t: {} for scene_t in scene.keys()}
@@ -249,7 +253,7 @@ class NuScenes(Dataset):
         for scene_token, scene_data_v in scene_data.items():
             n_samples = len(scene_samples[scene_token])
             for sensor_name, sample_data_v in scene_data_v.items():
-                kf = [-1] * n_samples
+                kf = np.full([n_samples], -1, dtype=np.int64)
                 for i, (_, is_key_frame, sample_token) in enumerate(sample_data_v):
                     if is_key_frame:  # is_keyframe
                         kf[sample_indices[sample_token]] = i
@@ -486,11 +490,12 @@ class NuScenes(Dataset):
     def rectangles(self, seq: int, frame: int):
         raise NotImplementedError
 
-    def semantic(self, seq, frame, keyframe=True):
-        if keyframe:  # TODO: impact of keyframe?
-            frame = self.scenes[seq].keyframes["lidarseg"][frame]
+    def semantic(self, seq, frame, sensor="LIDAR_TOP"):
+        seg_frame = np.searchsorted(self.scenes[seq].keyframes[sensor], frame, "left")
+        if self.scenes[seq].keyframes[sensor][seg_frame] != frame:
+            raise ValueError(f"frame {frame} is not a keyframe")
 
-        filename = self.scenes[seq].data["lidarseg"][frame].filename
+        filename = self.scenes[seq].data["lidarseg"][seg_frame].filename
         semantic = np.fromfile(os.path.join(self.root_dir, filename), dtype=np.uint8)
 
         if self.sem_label_map is not None:
@@ -498,11 +503,15 @@ class NuScenes(Dataset):
 
         return semantic
 
-    def instances(self, seq, frame, keyframe=True):
-        if keyframe:  # TODO: impact of keyframe?
-            frame = self.scenes[seq].keyframes["panoptic"][frame]
+    def instances(self, seq, frame, sensor="LIDAR_TOP"):
+        seg_frame = np.searchsorted(self.scenes[seq].keyframes[sensor], frame, "left")
+        if self.scenes[seq].keyframes[sensor][seg_frame] != frame:
+            raise ValueError(f"frame {frame} is not a keyframe")
 
-        filename = self.scenes[seq].data["panoptic"][frame].filename
+        filename = self.scenes[seq].data["panoptic"][seg_frame].filename
         panoptic = np.load(os.path.join(self.root_dir, filename))["data"] % 1000
 
         return panoptic
+
+    def keyframes(self, seq, sensor):
+        return self.scenes[seq].keyframes[sensor]
