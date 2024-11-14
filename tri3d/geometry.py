@@ -5,13 +5,7 @@ from typing import Self
 import numpy as np
 
 from .camera import project_kannala, project_pinhole
-from .quaternion import (
-    quaternion_multiply,
-    quaternion_rotation_matrix,
-    slerp,
-    as_euler,
-    from_euler,
-)
+from . import quaternion
 
 
 __all__ = [
@@ -212,7 +206,7 @@ class Rotation(Transformation):
 
     def __init__(self, quat):
         self.quat = np.asarray(quat)
-        self.mat = quaternion_rotation_matrix(self.quat)
+        self.mat = quaternion.rotation_matrix(self.quat)
 
     def __repr__(self):
         if self.single:
@@ -224,7 +218,7 @@ class Rotation(Transformation):
 
     def __matmul__(self, other: Transformation) -> Transformation:
         if isinstance(other, Rotation):
-            return Rotation(quaternion_multiply(self.quat, other.quat))
+            return Rotation(quaternion.multiply(self.quat, other.quat))
 
         elif isinstance(other, Translation):
             return RigidTransform(self, self.apply(other.vec))
@@ -270,14 +264,7 @@ class Rotation(Transformation):
     @classmethod
     def from_matrix(cls, mat):
         """Create a rotation from 3x3 or 4x4 rotation matrices."""
-        mat = np.asarray(mat)
-
-        w = 0.5 * np.sqrt(1 + mat[..., 0, 0] + mat[..., 1, 1] + mat[..., 2, 2])
-        x = (mat[..., 2, 1] - mat[..., 1, 2]) * 0.25 / w
-        y = (mat[..., 0, 2] - mat[..., 2, 0]) * 0.25 / w
-        z = (mat[..., 1, 0] - mat[..., 0, 1]) * 0.25 / w
-        quat = np.stack([w, x, y, z], axis=-1)
-        return cls(quat)
+        return cls(quaternion.from_matrix(np.asarray(mat)))
 
     def as_matrix(self) -> np.ndarray:
         """Return the rotation as a 4x4 rotation matrix."""
@@ -288,11 +275,11 @@ class Rotation(Transformation):
         return out
 
     def as_euler(self, seq: str, degrees: bool = False):
-        return as_euler(seq, self.quat, degrees)
+        return quaternion.as_euler(seq, self.quat, degrees)
 
     @classmethod
     def from_euler(cls, seq: str, angles, degrees: bool = False):
-        return cls(from_euler(seq, angles, degrees))
+        return cls(quaternion.from_euler(seq, angles, degrees))
 
 
 class Translation(Transformation):
@@ -385,7 +372,7 @@ class RigidTransform(Transformation):
             Interpolation ratio such that 0. -> p1, 1. -> p2.
         """
         w = np.asarray(w)
-        q = slerp(p1.rotation.quat, p2.rotation.quat, w)
+        q = quaternion.slerp(p1.rotation.quat, p2.rotation.quat, w)
         t = (1 - w[..., None]) * p1.translation.vec + w[..., None] * p2.translation.vec
         return cls(q, t)
 

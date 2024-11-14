@@ -1,9 +1,52 @@
 import numpy as np
 
 
+def from_matrix(mat):
+    mat = np.moveaxis(mat.reshape(mat.shape[:-2] + (9,)), -1, 0)
+    m00, m01, m02, m10, m11, m12, m20, m21, m22 = mat
+
+    tr = m00 + m11 + m22
+
+    out = np.zeros(tr.shape + (4,), dtype=tr.dtype)
+
+    last_mask = np.ones(tr.shape, dtype=bool)
+
+    mask = tr > 1e-6
+    last_mask &= ~mask
+    S = np.sqrt((tr + 1.0).clip(min=1e-6)) * 2
+    out[..., 0] += np.where(mask, (0.25 * S), 0)
+    out[..., 1] += np.where(mask, (m21 - m12) / S, 0)
+    out[..., 2] += np.where(mask, (m02 - m20) / S, 0)
+    out[..., 3] += np.where(mask, (m10 - m01) / S, 0)
+
+    mask = (m00 > m11 + 1e-6) & (m00 > m22 + 1e-6) & last_mask
+    last_mask &= ~mask
+    S = np.sqrt((1.0 + m00 - m11 - m22).clip(min=1e-6)) * 2
+    out[..., 0] += np.where(mask, (m21 - m12) / S, 0)
+    out[..., 1] += np.where(mask, (0.25 * S), 0)
+    out[..., 2] += np.where(mask, (m01 + m10) / S, 0)
+    out[..., 3] += np.where(mask, (m02 + m20) / S, 0)
+
+    mask = (m11 > m22 + 1e-6) & last_mask
+    last_mask &= ~mask
+    S = np.sqrt((1.0 + m11 - m00 - m22).clip(min=1e-6)) * 2
+    out[..., 0] += np.where(mask, (m02 - m20) / S, 0)
+    out[..., 1] += np.where(mask, (m01 + m10) / S, 0)
+    out[..., 2] += np.where(mask, (0.25 * S), 0)
+    out[..., 3] += np.where(mask, (m12 + m21) / S, 0)
+
+    S = np.sqrt((1.0 + m22 - m00 - m11).clip(min=1e-6)) * 2
+    out[..., 0] += np.where(last_mask, (m10 - m01) / S, 0)
+    out[..., 1] += np.where(last_mask, (m02 + m20) / S, 0)
+    out[..., 2] += np.where(last_mask, (m12 + m21) / S, 0)
+    out[..., 3] += np.where(last_mask, 0.25 * S, 0)
+
+    return out
+
+
 def from_euler(seq, angles, degrees=False):
     angles = np.asarray(angles)
-    
+
     if len(seq) == 1:
         angles = angles[..., None]
 
@@ -23,14 +66,14 @@ def from_euler(seq, angles, degrees=False):
             z = seq[i] == "z"
 
         else:
-            extrinsic_axes = quaternion_rotation_matrix(quat)
+            extrinsic_axes = rotation_matrix(quat)
             i = 0 if seq[i] == "X" else 1 if seq[i] == "Y" else 2
             x = extrinsic_axes[..., 0, i]
             y = extrinsic_axes[..., 1, i]
             z = extrinsic_axes[..., 2, i]
 
         q = np.stack([c, x * s, y * s, z * s], axis=-1)
-        quat = quaternion_multiply(q, quat)
+        quat = multiply(q, quat)
 
     return quat
 
@@ -123,7 +166,7 @@ def slerp(q0, q1, t):
     return np.where(dot[..., None] > 0.9995, out_linear, out_slerp)
 
 
-def quaternion_multiply(q0, q1):
+def multiply(q0, q1):
     q0 = np.asarray(q0)
     q1 = np.asarray(q1)
 
@@ -153,7 +196,7 @@ def quaternion_multiply(q0, q1):
     return out
 
 
-def quaternion_rotation_matrix(Q):
+def rotation_matrix(Q):
     """
     Covert a quaternion into a full three-dimensional rotation matrix.
 
