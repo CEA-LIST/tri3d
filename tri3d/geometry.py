@@ -257,7 +257,7 @@ class Rotation(Transformation):
         return np.linalg.vecdot(np.expand_dims(x, -2), self.mat)
 
     def inv(self) -> Self:
-        return Rotation(self.quat * [1, -1, -1, -1])
+        return Rotation(self.quat * np.array([1, -1, -1, -1], dtype=self.quat.dtype))
 
     @property
     def single(self) -> bool:

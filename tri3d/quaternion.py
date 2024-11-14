@@ -169,7 +169,7 @@ def quaternion_rotation_matrix(Q):
     y = Q[..., 2]
     z = Q[..., 3]
 
-    mat = np.zeros(Q.shape[:-1] + (3, 3))
+    mat = np.zeros(Q.shape[:-1] + (3, 3), dtype=Q.dtype)
 
     mat[..., 0, 0] = 1.0 - 2.0 * y * y - 2.0 * z * z
     mat[..., 0, 1] = 2.0 * x * y - 2.0 * z * w
@@ -182,7 +182,5 @@ def quaternion_rotation_matrix(Q):
     mat[..., 2, 0] = 2.0 * x * z - 2.0 * y * w
     mat[..., 2, 1] = 2.0 * y * z + 2.0 * x * w
     mat[..., 2, 2] = 1.0 - 2.0 * x * x - 2.0 * y * y
-
-    # mat[..., 3, 3] = 1
 
     return mat
