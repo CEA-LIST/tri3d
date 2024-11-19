@@ -96,7 +96,7 @@ class SemanticKITTI(Dataset):
 
     def __init__(self, root, sequences: list[str]):
         self.root = pathlib.Path(root)
-        self.sequences = sequences
+        self._sequences = sequences
 
         # Remap labels to 0, 1, ...
         self.label_lut = np.empty([max(label_names.keys()) + 1], dtype=np.int64)
@@ -148,18 +148,18 @@ class SemanticKITTI(Dataset):
         return self.__poses[seq]
 
     def _points(self, seq, frame, sensor):
-        path = self.root / self.sequences[seq] / "velodyne" / f"{frame:06d}.bin"
+        path = self.root / self._sequences[seq] / "velodyne" / f"{frame:06d}.bin"
         return np.fromfile(path, dtype=np.float32).reshape(-1, 4)
 
     def sequences(self):
-        return list(range(len(self.sequences)))
+        return list(range(len(self._sequences)))
 
     def timestamps(self, seq: int, sensor: str):
         return self._timestamps[seq]
 
     @memoize_method()
     def _labels(self, seq, frame):
-        path = self.root / self.sequences[seq] / "labels" / f"{frame:06d}.label"
+        path = self.root / self._sequences[seq] / "labels" / f"{frame:06d}.label"
         return np.fromfile(path, dtype=np.int16).reshape(-1, 2)
 
     def semantic(self, seq: int, frame: int, sensor=None):
