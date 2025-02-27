@@ -1,61 +1,38 @@
-import binascii
+import dataclasses
 import json
 import os
-import struct
-from collections import namedtuple
-import dataclasses
+import uuid
 
 import numpy as np
-
 import PIL.Image
 
 from ..geometry import (
     CameraProjection,
-    Rotation,
     RigidTransform,
+    Rotation,
     Translation,
 )
+from ..misc import memoize_method
 from .dataset import Box, Dataset
-
-Scene = namedtuple(
-    "Scene",
-    [
-        "data",
-        "calibration",
-        "ego_poses",
-        "keyframes",
-        "sample_tokens",
-        "sample_timestamps",
-        "boxes",
-    ],
-)
-DataFile = namedtuple("DataFile", ["token", "sample_token", "timestamp", "filename"])
-ImgDataFile = namedtuple(
-    "ImgDataFile", ["token", "sample_token", "timestamp", "filename", "width", "height"]
-)
-RawAnnotation = namedtuple(
-    "RawAnnotation",
-    [
-        "frame",
-        "timestamp",
-        "instance",
-        "category",
-        "visibility",
-        "attributes",
-        "position",
-        "size",
-        "rotation",
-        "num_lidar_pts",
-        "num_radar_pts",
-    ],
-)
-Pose = namedtuple("Pose", ["timestamp", "rotation", "position"])
 
 
 @dataclasses.dataclass(frozen=True)
 class NuScenesBox(Box):
-    visibility: int
-    attributes: int
+    attributes: list[str]
+    visibility: str
+    num_lidar_pts: int
+    num_radar_pts: int
+
+
+@dataclasses.dataclass()
+class Scene:
+    data: dict[str, list]
+    calibration: dict[str]
+    ego_poses: dict[str, RigidTransform]
+    keyframes: dict[str, np.ndarray]
+    sample_tokens: list[str]
+    timestamps: dict[str, np.ndarray]
+    boxes: list[NuScenesBox]
 
 
 class NuScenes(Dataset):
@@ -69,50 +46,58 @@ class NuScenes(Dataset):
        * Lidar pcl is rotated by 90° so x axis points forward.
        * Annotations are automatically interpolated between keyframes.
 
-    The :meth:`keyframes` method returns the indices of the keyframes for each 
+    The :meth:`keyframes` method returns the indices of the keyframes for each
     sensor. Keyframes aggregate a sample for each sensor around a timestamps
     at around 2Hz.
     """
 
+    scenes: list[Scene]
     _default_cam_sensor = "CAM_FRONT"
     _default_pcl_sensor = "LIDAR_TOP"
     _default_box_coords = "LIDAR_TOP"
 
     def __init__(
-        self, root, subset="v1.0-mini", det_label_map=None, sem_label_map=None
+        self,
+        root,
+        subset="v1.0-mini",
+        det_label_map=None,
+        sem_label_map=None,
     ):
-        self.root_dir = root
+        self.root = root
+        self.subset = subset
         self.det_label_map = det_label_map
         self.sem_label_map = sem_label_map
 
         # load original data
-        with open(os.path.join(root, subset, "attribute.json")) as f:
+        with open(os.path.join(root, subset, "attribute.json"), "rb") as f:
             attribute = json.load(f)
-        with open(os.path.join(root, subset, "calibrated_sensor.json")) as f:
+        with open(os.path.join(root, subset, "calibrated_sensor.json"), "rb") as f:
             calibrated_sensor = json.load(f)
-        with open(os.path.join(root, subset, "category.json")) as f:
+        with open(os.path.join(root, subset, "category.json"), "rb") as f:
             category = json.load(f)
-        with open(os.path.join(root, subset, "ego_pose.json")) as f:
+        with open(os.path.join(root, subset, "ego_pose.json"), "rb") as f:
             ego_pose = json.load(f)
-        with open(os.path.join(root, subset, "instance.json")) as f:
+        with open(os.path.join(root, subset, "instance.json"), "rb") as f:
             instance = json.load(f)
-        with open(os.path.join(root, subset, "sample.json")) as f:
+        with open(os.path.join(root, subset, "sample.json"), "rb") as f:
             sample = json.load(f)
-        with open(os.path.join(root, subset, "sample_annotation.json")) as f:
+        with open(os.path.join(root, subset, "sample_annotation.json"), "rb") as f:
             sample_annotation = json.load(f)
-        with open(os.path.join(root, subset, "sample_data.json")) as f:
+        with open(os.path.join(root, subset, "sample_data.json"), "rb") as f:
             sample_data = json.load(f)
-        with open(os.path.join(root, subset, "scene.json")) as f:
+        with open(os.path.join(root, subset, "scene.json"), "rb") as f:
             scene = json.load(f)
-        with open(os.path.join(root, subset, "sensor.json")) as f:
+        with open(os.path.join(root, subset, "sensor.json"), "rb") as f:
             sensor = json.load(f)
+        with open(os.path.join(root, subset, "visibility.json"), "rb") as f:
+            visibility = json.load(f)
         if os.path.exists(os.path.join(root, subset, "lidarseg.json")):
-            with open(os.path.join(root, subset, "lidarseg.json")) as f:
+            with open(os.path.join(root, subset, "lidarseg.json"), "rb") as f:
                 lidarseg = json.load(f)
         else:
             lidarseg = []
         if os.path.exists(os.path.join(root, subset, "panoptic.json")):
-            with open(os.path.join(root, subset, "panoptic.json")) as f:
+            with open(os.path.join(root, subset, "panoptic.json"), "rb") as f:
                 panoptic = json.load(f)
         else:
             panoptic = []
@@ -124,12 +109,9 @@ class NuScenes(Dataset):
         ego_pose = {v["token"]: v for v in ego_pose}
         instance = {v["token"]: v for v in instance}
         sample = {v["token"]: v for v in sample}
-        sample_annotation = {v["token"]: v for v in sample_annotation}
         sample_data = {v["token"]: v for v in sample_data}
         scene = {v["token"]: v for v in scene}
         sensor = {v["token"]: v for v in sensor}
-        lidarseg = {v["token"]: v for v in lidarseg}
-        panoptic = {v["token"]: v for v in panoptic}
 
         # extract sensor names
         self.cam_sensors = []
@@ -146,253 +128,179 @@ class NuScenes(Dataset):
         self.det_labels = [c["name"] for c in category.values()]
         self.sem_labels = self.det_labels
 
-        # group samples by scenes
-        scene_samples = {scene_t: {} for scene_t in scene.keys()}
-        for sample_t, sample_v in sample.items():
-            scene_samples[sample_v["scene_token"]][sample_t] = sample_v
+        # categories
+        if "index" in next(iter(category.values())):
+            self.categories = [None] * (max(c["index"] for c in category.values()) + 1)
+            for c in category.values():
+                self.categories[c["index"]] = c["name"]
+        else:
+            self.categories = [c["name"] for c in category.values()]
 
-        # assign incremental sample indices within scenes
-        sample_indices = {}
-        scene_sample_tokens = {scene_t: [] for scene_t in scene_samples.keys()}
-        for scene_samples_t, scene_samples_v in scene_samples.items():
-            sample_idx = 0
-            sample_t = scene[scene_samples_t]["first_sample_token"]
+        # merge channel name into sample_data
+        for sample_data_v in sample_data.values():
+            calibrated_sensor_t = sample_data_v["calibrated_sensor_token"]
+            calibrated_sensor_v = calibrated_sensor[calibrated_sensor_t]
+            sensor_v = sensor[calibrated_sensor_v["sensor_token"]]
+            sample_data_v["channel"] = sensor_v["channel"]
+
+        # merge ego pose into sample_data
+        for sample_data_v in sample_data.values():
+            sample_data_v["ego_pose"] = ego_pose[sample_data_v["ego_pose_token"]]
+
+        # merge lidarseg and panoptic into sample_data
+        for lidarseg_v in lidarseg:
+            sample_data_t = lidarseg_v["sample_data_token"]
+            sample_data[sample_data_t]["lidarseg_filename"] = lidarseg_v["filename"]
+
+        for panoptic_v in panoptic:
+            sample_data_t = lidarseg_v["sample_data_token"]
+            sample_data[sample_data_t]["panoptic_filename"] = panoptic_v["filename"]
+
+        # group sample tokens by scenes
+        scene_samples = {scene_t: [] for scene_t in scene.keys()}
+        sample_idx = {}
+        for scene_t, scene_v in scene.items():
+            sample_t = scene_v["first_sample_token"]
+            i = 0
             while sample_t != "":
-                sample_indices[sample_t] = sample_idx
-                scene_sample_tokens[scene_samples_t].append(sample_t)
-                sample_t = scene_samples_v[sample_t]["next"]
-                sample_idx += 1
+                scene_samples[scene_t].append(sample_t)
+                sample_idx[sample_t] = i
+                sample_t = sample[sample_t]["next"]
+                i += 1
 
-        # group sensor data by scene
-        scene_data = {
-            scene_t: {sensor_v["channel"]: [] for sensor_v in sensor.values()}
-            for scene_t in scene.keys()
-        }
+        # Group sample data by scene
+        scene_data = {scene_t: {} for scene_t in scene.keys()}
 
         for sample_data_v in sample_data.values():
-            sensor_token = calibrated_sensor[sample_data_v["calibrated_sensor_token"]][
-                "sensor_token"
-            ]
-            sensor_name = sensor[sensor_token]["channel"]
-            scene_token = sample[sample_data_v["sample_token"]]["scene_token"]
-            if "CAM" in sensor_name:
-                scene_data[scene_token][sensor_name].append(
-                    (
-                        ImgDataFile(
-                            token=sample_data_v["token"],
-                            sample_token=sample_data_v["sample_token"],
-                            timestamp=sample_data_v["timestamp"],
-                            filename=sample_data_v["filename"],
-                            width=sample_data_v["width"],
-                            height=sample_data_v["height"],
-                        ),
-                        sample_data_v["is_key_frame"],
-                        sample_data_v["sample_token"],
-                    )
-                )
-            else:
-                scene_data[scene_token][sensor_name].append(
-                    (
-                        DataFile(
-                            token=sample_data_v["token"],
-                            sample_token=sample_data_v["sample_token"],
-                            timestamp=sample_data_v["timestamp"],
-                            filename=sample_data_v["filename"],
-                        ),
-                        sample_data_v["is_key_frame"],
-                        sample_data_v["sample_token"],
-                    )
-                )
+            sample_t = sample_data_v["sample_token"]
+            sample_v = sample[sample_t]
+            scene_t = sample_v["scene_token"]
+            channel = sample_data_v["channel"]
 
-        # add semantic segmentation data
-        for d in scene_data.values():
-            d["lidarseg"] = []
-        for lidarseg_v in lidarseg.values():
-            sample_data_v = sample_data[lidarseg_v["sample_data_token"]]
-            scene_token = sample[sample_data_v["sample_token"]]["scene_token"]
-            scene_data[scene_token]["lidarseg"].append(
-                (
-                    DataFile(
-                        token=sample_data_v["token"],
-                        sample_token=sample_data_v["sample_token"],
-                        timestamp=sample_data_v["timestamp"],
-                        filename=lidarseg_v["filename"],
-                    ),
-                    sample_data_v["is_key_frame"],
-                    sample_data_v["sample_token"],
-                )
-            )
+            if channel not in scene_data[scene_t]:
+                scene_data[scene_t][channel] = []
 
-        # add panoptic segmentation data
-        for d in scene_data.values():
-            d["panoptic"] = []
-        for panoptic_v in panoptic.values():
-            sample_data_v = sample_data[panoptic_v["sample_data_token"]]
-            scene_token = sample[sample_data_v["sample_token"]]["scene_token"]
-            scene_data[scene_token]["panoptic"].append(
-                (
-                    DataFile(
-                        token=sample_data_v["token"],
-                        sample_token=sample_data_v["sample_token"],
-                        timestamp=sample_data_v["timestamp"],
-                        filename=panoptic_v["filename"],
-                    ),
-                    sample_data_v["is_key_frame"],
-                    sample_data_v["sample_token"],
-                )
-            )
+            scene_data[scene_t][channel].append(sample_data_v)
 
-        # order scene data by timestamp
+        # sort sample data by timestamps
         for scene_data_v in scene_data.values():
-            for k, v in scene_data_v.items():
-                scene_data_v[k] = sorted(v, key=lambda s: s[0].timestamp)
+            for channel in list(scene_data_v.keys()):
+                scene_data_v[channel] = sorted(
+                    scene_data_v[channel], key=lambda d: d["timestamp"]
+                )
 
-        # index data keyframes
-        scene_keyframes = {scene_t: {} for scene_t in scene.keys()}
-
-        for scene_token, scene_data_v in scene_data.items():
-            n_samples = len(scene_samples[scene_token])
-            for sensor_name, sample_data_v in scene_data_v.items():
-                kf = np.full([n_samples], -1, dtype=np.int64)
-                for i, (_, is_key_frame, sample_token) in enumerate(sample_data_v):
-                    if is_key_frame:  # is_keyframe
-                        kf[sample_indices[sample_token]] = i
-
-                scene_keyframes[scene_token][sensor_name] = kf
-
-        # drop extra scene_data items
-        scene_data = {
-            scene_token: {
-                modality_name: [d for d, _, _ in modality_data]
-                for modality_name, modality_data in scene_data_v.items()
-            }
-            for scene_token, scene_data_v in scene_data.items()
-        }
-
-        # group sensor calibration by scene
-        scene_calibration = {scene_t: {} for scene_t in scene.keys()}
-        for scene_t, scene_data_v in scene_data.items():
-            for sensor_name, sample_data_v in scene_data_v.items():
-                if len(sample_data_v) > 0:
-                    calibrated_sensor_token = sample_data[sample_data_v[0].token][
-                        "calibrated_sensor_token"
-                    ]
-                    scene_calibration[scene_t][sensor_name] = calibrated_sensor[
-                        calibrated_sensor_token
-                    ]
-
-        # duplicate 'CAM_*' with 'IMG_*' sensor field for convenience
-        for sd in scene_data.values():
-            for sensor_name, data in list(sd.items()):
-                if sensor_name.startswith("CAM_"):
-                    sd["IMG_" + sensor_name[4:]] = data
-
-        for sd in scene_calibration.values():
-            for sensor_name, data in list(sd.items()):
-                if sensor_name.startswith("CAM_"):
-                    sd["IMG_" + sensor_name[4:]] = data
-
-        for sd in scene_keyframes.values():
-            for sensor_name, data in list(sd.items()):
-                if sensor_name.startswith("CAM_"):
-                    sd["IMG_" + sensor_name[4:]] = data
-
-        # group sample timestamps by scene
-        scene_sample_ts = {scene_token: [] for scene_token in scene.keys()}
-        for scene_t, scene_samples_v in scene_samples.items():
-            scene_sample_ts[scene_t] = np.sort(
-                [sample["timestamp"] for sample in scene_samples_v.values()]
-            )
-
-        # group ego pose by scene, indexed by timestamp
-        scene_ego_poses = {scene_token: {} for scene_token in scene.keys()}
-        for sample_data_v in sample_data.values():
-            scene_token = sample[sample_data_v["sample_token"]]["scene_token"]
-            ego_pose_v = ego_pose[sample_data_v["ego_pose_token"]]
-            scene_ego_poses[scene_token][sample_data_v["timestamp"]] = Pose(
-                timestamp=ego_pose_v["timestamp"],
-                rotation=ego_pose_v["rotation"],
-                position=ego_pose_v["translation"],
-            )
-
-        # add object annotation data
-        scene_boxes = {scene_token: [] for scene_token in scene.keys()}
-
-        for sample_annotation_v in sample_annotation.values():
-            scene_token = sample[sample_annotation_v["sample_token"]]["scene_token"]
-            category_token = instance[sample_annotation_v["instance_token"]][
-                "category_token"
-            ]
-            annotation_category = category[category_token]["name"]
-            frame = sample_indices[sample_annotation_v["sample_token"]]
-            timestamp = sample[sample_annotation_v["sample_token"]]["timestamp"]
+        # Group box annotations by scene
+        scene_annotations = {scene_t: [] for scene_t in scene.keys()}
+        for sample_annotation_v in sample_annotation:
+            sample_t = sample_annotation_v["sample_token"]
+            scene_t = sample[sample_t]["scene_token"]
+            instance_t = sample_annotation_v["instance_token"]
+            center = sample_annotation_v["translation"]
+            rotation = sample_annotation_v["rotation"]
+            transform = RigidTransform(rotation, center)
+            label = category[instance[instance_t]["category_token"]]["name"]
             annotation_attributes = [
                 attribute[t]["name"] for t in sample_annotation_v["attribute_tokens"]
             ]
+            if "visibility_t" in sample_annotation_v is None:
+                visibility = visibility[sample_annotation_v["visibility_t"]]["level"]
+            else:
+                box_visibility = None
             width, length, height = sample_annotation_v["size"]
-            scene_boxes[scene_token].append(
-                RawAnnotation(
-                    frame=frame,
-                    timestamp=timestamp,
-                    instance=sample_annotation_v["instance_token"],
-                    category=annotation_category,
-                    visibility=sample_annotation_v["visibility_token"],
-                    attributes=annotation_attributes,
-                    position=sample_annotation_v["translation"],
+
+            scene_annotations[scene_t].append(
+                NuScenesBox(
+                    frame=sample_idx[sample_t],
+                    uid=instance_t,
+                    center=center,
                     size=(length, width, height),
-                    rotation=sample_annotation_v["rotation"],
+                    heading=transform.rotation.as_euler("ZYX")[0],
+                    transform=transform,
+                    label=label,
+                    attributes=annotation_attributes,
+                    visibility=box_visibility,
                     num_lidar_pts=sample_annotation_v["num_lidar_pts"],
                     num_radar_pts=sample_annotation_v["num_radar_pts"],
                 )
             )
-            assert len(scene_boxes[scene_token][-1].rotation) == 4
 
-        # sort by frame
-        scene_boxes = {
-            t: sorted(o, key=lambda a: (a.frame, a.instance))
-            for t, o in scene_boxes.items()
+        scene_annotations = {  # sort by frame and uid
+            scene_t: sorted(boxes, key=lambda b: (b.frame, b.uid))
+            for scene_t, boxes in scene_annotations.items()
         }
 
-        if "index" in next(iter(category.values())):
-            categories = [None] * (max(c["index"] for c in category.values()) + 1)
-            for c in category.values():
-                categories[c["index"]] = c["name"]
-        else:
-            categories = [c["name"] for c in category.values()]
+        self.scenes = []
+        for scene_t in sorted(scene.keys()):
+            # calib
+            scene_calibration = {}
+            scene_ego_poses = {}
+            scene_keyframes = {}
+            scene_timestamps = {}
+            scene_data_ = {}
 
-        # rotate lidars to make x point forward
-        for scene_calibs in scene_calibration.values():
-            for sensor, sensor_calibs in scene_calibs.items():
-                if sensor in self.pcl_sensors:
-                    sensor_calibs["rotation"] = (
-                        Rotation(sensor_calibs["rotation"])
+            for channel, channel_data_v in scene_data[scene_t].items():
+                if channel not in self.pcl_sensors and channel not in self.cam_sensors:
+                    continue
+
+                calib = calibrated_sensor[channel_data_v[0]["calibrated_sensor_token"]]
+
+                if channel in self.pcl_sensors:
+                    calib["rotation"] = (
+                        Rotation(calib["rotation"])
                         @ Rotation.from_euler("Z", np.pi / 2)
                     ).as_quat()
 
-        # set attributes
-        self.categories = categories
+                scene_calibration[channel] = calib
 
-        self.scenes = [
-            Scene(
-                scene_data[t],
-                scene_calibration[t],
-                scene_ego_poses[t],
-                scene_keyframes[t],
-                scene_sample_tokens[t],
-                scene_sample_ts[t],
-                scene_boxes[t],
+                scene_ego_poses[channel] = RigidTransform(
+                    [d["ego_pose"]["rotation"] for d in channel_data_v],
+                    [d["ego_pose"]["translation"] for d in channel_data_v],
+                )
+
+                scene_keyframes[channel] = np.array(
+                    [i for i, d in enumerate(channel_data_v) if d["is_key_frame"]]
+                )
+
+                scene_timestamps[channel] = np.array(
+                    [d["timestamp"] for d in channel_data_v]
+                )
+
+                scene_data_[channel] = [d["filename"] for d in channel_data_v]
+
+                if channel in self.pcl_sensors:
+                    scene_data_["lidarseg"] = [
+                        d.get("lidarseg_filename", None) for d in channel_data_v
+                    ]
+                    scene_data_["panoptic"] = [
+                        d.get("panoptic_filename", None) for d in channel_data_v
+                    ]
+
+            scene_timestamps["sample"] = np.array(
+                [sample[sample_t]["timestamp"] for sample_t in scene_samples[scene_t]]
             )
-            for t in sorted(scene.keys())
-        ]
+
+            self.scenes.append(
+                Scene(
+                    data=scene_data_,
+                    calibration=scene_calibration,
+                    ego_poses=scene_ego_poses,
+                    keyframes=scene_keyframes,
+                    sample_tokens=scene_samples[scene_t],
+                    timestamps=scene_timestamps,
+                    boxes=scene_annotations[scene_t],
+                )
+            )
 
         self.annotations_cache = {}
 
+    @memoize_method(maxsize=100)
     def _calibration(self, seq, src_sensor, dst_sensor):
         if src_sensor == dst_sensor:
             return Translation([0.0, 0.0, 0.0])
 
         if dst_sensor in self.img_sensors:
-            intrinsic = self.scenes[seq].calibration[dst_sensor]["camera_intrinsic"]
+            cam_sensor = self.cam_sensors[self.img_sensors.index(dst_sensor)]
+            intrinsic = self.scenes[seq].calibration[cam_sensor]["camera_intrinsic"]
             intrinsic = (
                 intrinsic[0][0],
                 intrinsic[1][1],
@@ -406,14 +314,14 @@ class NuScenes(Dataset):
 
             return cam2img @ src2cam
 
-        if src_sensor not in (self.cam_sensors + self.pcl_sensors):
+        if src_sensor == "ego":
+            return self._calibration(seq, dst_sensor, src_sensor).inv()
+
+        if src_sensor not in self.cam_sensors and src_sensor not in self.pcl_sensors:
             raise ValueError()
 
-        if src_sensor == "ego":
-            src_calib = Translation([0, 0, 0])
-        else:
-            src_calib = self.scenes[seq].calibration[src_sensor]
-            src_calib = RigidTransform(src_calib["rotation"], src_calib["translation"])
+        src_calib = self.scenes[seq].calibration[src_sensor]
+        src_calib = RigidTransform(src_calib["rotation"], src_calib["translation"])
 
         if dst_sensor == "ego":
             dst_calib = Translation([0, 0, 0])
@@ -423,80 +331,57 @@ class NuScenes(Dataset):
 
         return dst_calib.inv() @ src_calib
 
+    @memoize_method(maxsize=10)
     def _poses(self, seq, sensor):
+        if sensor == "boxes":
+            N = len(self.scenes[seq].sample_tokens)
+            return RigidTransform.from_matrix(np.tile(np.eye(4), (N, 1, 1)))
+
         if sensor in self.img_sensors:
             sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
-        if sensor == "boxes":
-            num_frames = len(self.scenes[seq].keyframes["LIDAR_TOP"])
-            return RigidTransform.from_matrix(np.tile(np.eye(4), (num_frames, 1, 1)))
-
-        ego_poses = [
-            self.scenes[seq].ego_poses[t] for t in self.timestamps(seq, sensor)
-        ]
-        ego_poses = RigidTransform(
-            [p.rotation for p in ego_poses], [p.position for p in ego_poses]
+        return self.scenes[seq].ego_poses[sensor] @ self._calibration(
+            seq, sensor, "ego"
         )
-
-        return ego_poses @ self._calibration(seq, sensor, "ego")
 
     def _points(self, seq, frame, sensor):
-        filename = os.path.join(
-            self.root_dir, self.scenes[seq].data[sensor][frame].filename
-        )
+        filename = os.path.join(self.root, self.scenes[seq].data[sensor][frame])
         pcl = np.fromfile(filename, dtype=np.float32).reshape(-1, 5)
+
+        # Rotate pcl to make x point forward
         pcl[:, 0], pcl[:, 1] = pcl[:, 1], -pcl[:, 0]
         return pcl
 
     def _boxes(self, seq):
-        out = []
-
-        for b in self.scenes[seq].boxes:
-            obj2coords = RigidTransform(b.rotation, b.position)
-            out.append(
-                NuScenesBox(
-                    frame=b.frame,
-                    uid=struct.unpack("Q", binascii.unhexlify(b.instance)[:8])[0],
-                    center=obj2coords.apply([0, 0, 0]),
-                    size=b.size,
-                    heading=obj2coords.rotation.as_euler("ZYX")[0],
-                    transform=obj2coords,
-                    label=b.category,
-                    visibility=b.visibility,
-                    attributes=b.attributes,
-                    # num_lidar_pts=b.num_lidar_pts,
-                    # num_radar_pts=b.num_radar_pts,
-                )
-            )
-
-        return out
+        return self.scenes[seq].boxes
 
     def sequences(self):
         return list(range(len(self.scenes)))
 
     def timestamps(self, seq, sensor):
         if sensor == "boxes":
-            return self.scenes[seq].sample_timestamps
-        else:
-            return np.array(
-                [sample.timestamp for sample in self.scenes[seq].data[sensor]]
-            )
+            sensor = "sample"
+        elif sensor in self.img_sensors:
+            sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
-    def image(self, seq, frame, sensor="CAM_FRONT", keyframe=True):
-        return PIL.Image.open(
-            os.path.join(self.root_dir, self.scenes[seq].data[sensor][frame].filename)
-        )
+        return self.scenes[seq].timestamps[sensor]
+
+    def image(self, seq, frame, sensor="CAM_FRONT"):
+        if sensor in self.img_sensors:
+            sensor = self.cam_sensors[self.img_sensors.index(sensor)]
+
+        filename = os.path.join(self.root, self.scenes[seq].data[sensor][frame])
+        return PIL.Image.open(filename)
 
     def rectangles(self, seq: int, frame: int):
         raise NotImplementedError
 
     def semantic(self, seq, frame, sensor="LIDAR_TOP"):
-        seg_frame = np.searchsorted(self.scenes[seq].keyframes[sensor], frame, "left")
-        if self.scenes[seq].keyframes[sensor][seg_frame] != frame:
-            raise ValueError(f"frame {frame} is not a keyframe")
+        filename = self.scenes[seq].data["lidarseg"][frame]
+        if filename is None:
+            raise ValueError(f"frame {frame} has no segmentation")
 
-        filename = self.scenes[seq].data["lidarseg"][seg_frame].filename
-        semantic = np.fromfile(os.path.join(self.root_dir, filename), dtype=np.uint8)
+        semantic = np.fromfile(os.path.join(self.root, filename), dtype=np.uint8)
 
         if self.sem_label_map is not None:
             semantic = self.sem_label_map[semantic]
@@ -504,14 +389,94 @@ class NuScenes(Dataset):
         return semantic
 
     def instances(self, seq, frame, sensor="LIDAR_TOP"):
-        seg_frame = np.searchsorted(self.scenes[seq].keyframes[sensor], frame, "left")
-        if self.scenes[seq].keyframes[sensor][seg_frame] != frame:
-            raise ValueError(f"frame {frame} is not a keyframe")
+        filename = self.scenes[seq].data["panoptic"][frame]
+        if filename is None:
+            raise ValueError(f"frame {frame} has no panoptic")
 
-        filename = self.scenes[seq].data["panoptic"][seg_frame].filename
-        panoptic = np.load(os.path.join(self.root_dir, filename))["data"] % 1000
+        panoptic = np.load(os.path.join(self.root, filename))["data"] % 1000
 
         return panoptic
 
     def keyframes(self, seq, sensor):
+        """The indices of the keyframes within the frames of each sensor."""
+        if sensor in self.img_sensors:
+            sensor = self.cam_sensors[self.img_sensors.index(sensor)]
+
         return self.scenes[seq].keyframes[sensor]
+
+    def sample_tokens(self, seq):
+        """The sample token for each keyframe."""
+        return self.scenes[seq].sample_tokens
+
+
+def dump_nuscene_boxes(
+    dataset: NuScenes,
+    seq_indices: list[int],
+    sensor: str,
+    boxes: list[NuScenesBox],
+    keyframes: bool = False,
+):
+    """Convert boxes to the NuScene format (`sample_annotation.json`).
+
+    Args:
+        dataset: the nuscene dataset
+        poses: *for each box* the index of its sequence
+        sensor: the coordinate system in which box poses are expressed
+        boxes: the boxes to export
+        keyframes:
+            Whether boxes[*].frame indexes the keyframes or the sensor timeline.
+
+    Note: Boxes on frames other than keyframes are skipped.
+
+    Warning:
+        New annotation token are generated so the `{first,last}_annotation_token`
+        foreign keys in `instance.json` won't work with the exported boxes.
+        These fields are not used in tri3D.
+    """
+    out = []
+    prev = None
+    token = uuid.uuid4().hex
+    next = uuid.uuid4().hex
+
+    assert len(seq_indices) == len(boxes)
+
+    for i, s, b in zip(range(len(boxes)), seq_indices, boxes):
+        if keyframes:
+            frame = dataset.keyframes(s, sensor)[b.frame]
+            sample_token = dataset.sample_tokens(s)[b.frame]
+        else:
+            frame = b.frame
+            try:
+                keyframe_idx = dataset.keyframes(s, sensor).index(b.frame)
+            except KeyError:
+                continue
+            sample_token = dataset.sample_tokens(s)[keyframe_idx]
+
+        ego_pose = dataset.poses(s, sensor)[frame]
+        box_pose = ego_pose @ b.transform
+        length, width, height = b.size
+
+        out.append(
+            {
+                "token": token,
+                "sample_token": sample_token,
+                "instance_token": b.uid,
+                "attribute_token": [],  # TODO
+                "visibility_token": None,  # TODO
+                "translation": box_pose.translation.vec,
+                "size": [width, length, height],
+                "rotation": box_pose.rotation.quat,
+                "num_lidar_pts": b.num_lidar_pts,
+                "num_radar_pts": b.num_radar_pts,
+                "prev": prev,
+                "next": next,
+            }
+        )
+
+        prev = token
+        token = next
+        next = uuid.uuid4().hex
+
+    out[-1]["next"] = None
+
+    return out
