@@ -5,8 +5,7 @@ import numpy as np
 
 from . import geometry
 
-
-bbox_edges = np.array(
+bbox_vertices = np.array(
     [
         (-0.5, -0.5, -0.5),
         (+0.5, -0.5, -0.5),
@@ -18,10 +17,25 @@ bbox_edges = np.array(
         (-0.5, +0.5, +0.5),
         (+0.5, +0.0, -0.5),
         (+0.0, +0.0, -0.5),
-        (+0.0, +0.0, +0.0),
     ]
 )
-bbox_path = [0, 1, 8, 9, 8, 2, 3, 0, 4, 5, 1, 5, 6, 2, 6, 7, 3, 7, 4]
+bbox_edges = np.array(
+    [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 0],
+        [4, 5],
+        [5, 6],
+        [6, 7],
+        [7, 4],
+        [0, 4],
+        [1, 5],
+        [2, 6],
+        [3, 7],
+        [8, 9],
+    ]
+)
 
 
 try:
@@ -34,9 +48,9 @@ else:
         plot: k3d.Plot,
         transforms: List[geometry.Transformation],
         sizes: np.ndarray,
-        c: int | Tuple[int, ...] | None = None,
+        c: int | Tuple | np.ndarray | None = None,
         *kargs,
-        **kwargs
+        **kwargs,
     ):
         """Add 3D boxes to a k3d plot.
 
@@ -45,20 +59,43 @@ else:
         :param sizes: N by 3 array of object sizes
         :param c: edge colors, either as a single or per box value.
         """
-        if c is None:
-            c = [0x0000FF00] * len(sizes)
-        if isinstance(c, tuple) or isinstance(c, int):
-            c = [c] * len(sizes)
-        if len(c) > 0 and isinstance(c[0], tuple):
-            c = [to_k3d_colors(c_) for c_ in c]
+        if isinstance(c, int):
+            c = np.full([len(sizes)], c, dtype=np.uint32)
+        elif isinstance(c, tuple):
+            c = np.tile(to_k3d_colors(c), (len(sizes), 1))
+        elif c is None:
+            c = np.full([len(sizes)], 0x0000FF00, dtype=np.uint32)
+        else:
+            c = np.asarray(c)
+            if c.ndim == 2:
+                c = to_k3d_colors(c)
 
-        for t, s, c_ in zip(transforms, sizes, c):
-            path = t.apply(bbox_edges[bbox_path] * s)
-            plot += k3d.line(path.astype(np.float32), color=c_, *kargs, **kwargs)
+        vertices = [np.empty([0, 3])]
+        edges = [np.empty([0, 2], dtype=int)]
+
+        for t, s in zip(transforms, sizes):
+            vertices.append(t.apply(bbox_vertices * s))
+            edges.append(bbox_edges + len(edges) * len(bbox_vertices))
+
+        vertices = np.concatenate(vertices)
+        edges = np.concatenate(edges)
+        colors = c.repeat(len(bbox_vertices))
+
+        plot += k3d.lines(
+            vertices.astype(np.float32),
+            edges,
+            indices_type="segment",
+            colors=colors,
+            *kargs,
+            **kwargs,
+        )
 
 
 try:
-    from matplotlib import colors as mcolors, patches as mpatches, pyplot as plt
+    from matplotlib import colors as mcolors
+    from matplotlib import patches as mpatches
+    from matplotlib import pyplot as plt
+    from matplotlib.collections import LineCollection
 except ImportError:
     pass
 else:
@@ -87,16 +124,20 @@ else:
         transform: geometry.Transformation,
         size: np.ndarray,
         img_size: Tuple[int, int],
-        **kwargs
+        ax=None,
+        **kwargs,
     ):
         """Add a 3D box to a matplotlib plot.
 
         :param transform: transformation from box local to image coordinates
         :param size: object size (length, width height)
         :param img_size: plot size (width, height)
-        :param kwargs: arguments forwarded to :func:`plt.plot`
+        :param kwargs: arguments forwarded to :func:`LineCollection`
         """
-        pts_2d = transform.apply(bbox_edges * size)
+        if ax is None:
+            ax = plt.gca()
+
+        pts_2d = transform.apply(bbox_vertices * size)
         invisible = all(
             (pts_2d[:, 2] < 0)
             | (pts_2d[:, 0] < 0)
@@ -105,7 +146,8 @@ else:
             | (pts_2d[:, 1] > img_size[1])
         )
         if not invisible:
-            plt.plot(pts_2d[bbox_path, 0], pts_2d[bbox_path, 1], **kwargs)
+            lc = LineCollection(pts_2d[bbox_edges, :2], **kwargs)
+            ax.add_collection(lc)
 
     def plot_rectangles(centers, sizes, ax=None, **kwargs):
         ax = ax or plt.gca()
@@ -140,7 +182,7 @@ else:
                 angle=h / np.pi * 180,
                 fill=False,
                 color=c_,
-                **kwargs
+                **kwargs,
             )
             ax.add_patch(r)
 
@@ -154,7 +196,7 @@ else:
                 fill=True,
                 color=c_,
                 length_includes_head=True,
-                **kwargs
+                **kwargs,
             )
             ax.add_patch(a)
 
