@@ -478,6 +478,15 @@ class CameraProjection(Transformation):
         raise NotImplementedError
 
 
+def as_matrix(t: Transformation) -> np.ndarray:
+    """Formulate transformation as a 4x4 matrix."""
+    m = t.apply(np.eye(4, 3))
+    out = np.tile(np.eye(4), m.shape[:-2] + (1, 1))
+    out[..., :3, :3] = (m[..., :3, :3] - m[..., 3, :]).swapaxes(-1, -2)
+    out[..., :3, 3] = m[..., 3, :]
+    return out
+
+
 def where_in_box(pts, size, box2sensor: Transformation) -> np.ndarray:
     """Return the points that lie inside a bounding box.
 

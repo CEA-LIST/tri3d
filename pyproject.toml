@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 keywords = []
 license = { text = "CECILL-C" }
 classifiers = []
-dependencies = ["numpy", "Pillow", "shapely", "pyarrow"]
+dependencies = ["numpy", "Pillow", "shapely", "pyarrow", "pypcd4", "numba"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
@@ -19,6 +19,7 @@ plot = ["matplotlib", "k3d"]
 jupyter = ["ipykernel", "ipywidgets", "ipympl"]
 doc = ["sphinx", "nbsphinx", "furo"]
 test = ["scipy>=1.6.0", "sphinx", "nbsphinx", "furo"]
+nuscenes_icp = ["torch", "torch-cluster", "tqdm"]
 
 [tool.setuptools]
 packages = ["tri3d"]
@@ -27,3 +28,20 @@ packages = ["tri3d"]
 
 [tool.coverage.report]
 exclude_lines = ["@abstractmethod", "raise NotImplementedError", "__repr__"]
+
+[tool.ruff]
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+extend-select = ["I"]
+
+[[tool.uv.index]]
+name = "pyg"
+url = "https://data.pyg.org/whl/torch-2.7.0+cu126.html"
+ignore-error-codes = [403]
+format = "flat"
+
+[tool.uv.sources]
+torch-scatter = { index = "pyg" }
+torch-cluster = { index = "pyg" }
