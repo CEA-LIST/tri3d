@@ -1,3 +1,4 @@
+import numba as nb
 import numpy as np
 
 
@@ -94,7 +95,7 @@ def as_euler(seq: str, quat: np.ndarray, degrees: bool = False):
     if not seq.islower():
         raise ValueError("Cannot mix intrinsic and extrinsic rotations")
 
-    i, j, k = ["xyz".index(ax) + 1 for ax in seq]
+    i, j, k = [1 if ax == "x" else 2 if ax == "y" else 3 for ax in seq]
     if i == j or j == k:
         raise ValueError("invalid rotation axes")
 
@@ -104,34 +105,44 @@ def as_euler(seq: str, quat: np.ndarray, degrees: bool = False):
     else:
         not_proper = True
 
+    out = np.empty(quat.shape[:-1] + (3,), dtype=quat.dtype)
+    as_euler_nb(i, j, k, not_proper, quat, out)
+    return out
+
+
+@nb.guvectorize(
+    [(nb.int32, nb.int32, nb.int32, nb.bool, nb.float64[:], nb.float64[:])],
+    "(),(),(),(),(m),(n)",
+)
+def as_euler_nb(
+    i: int, j: int, k: int, not_proper: bool, quat: np.ndarray, out: np.ndarray
+):
     eps = (i - j) * (j - k) * (k - i) // 2
 
     if not_proper:
-        a = quat[..., 0] - quat[..., j]
-        b = quat[..., i] + quat[..., k] * eps
-        c = quat[..., j] + quat[..., 0]
-        d = quat[..., k] * eps - quat[..., i]
+        a = quat[0] - quat[j]
+        b = quat[i] + quat[k] * eps
+        c = quat[j] + quat[0]
+        d = quat[k] * eps - quat[i]
     else:
-        a = quat[..., 0]
-        b = quat[..., i]
-        c = quat[..., j]
-        d = quat[..., k] * eps
+        a = quat[0]
+        b = quat[i]
+        c = quat[j]
+        d = quat[k] * eps
 
     theta2 = np.arccos(2 * (a**2 + b**2) / (a**2 + b**2 + c**2 + d**2) - 1)
     thetap = np.arctan2(b, a)
     thetam = np.arctan2(d, c)
 
-    case1 = theta2 < 1e-6
-    case2 = np.abs(theta2 - np.pi / 2) < 1e-6
-    out1 = 0
-    out2 = 0
-    out3 = thetap - thetam
-    theta1 = np.where(case1, out1, np.where(case2, out2, out3))
-
-    out1 = 2 * thetap - theta1
-    out2 = 2 * thetam + theta1
-    out3 = thetap + thetam
-    theta3 = np.where(case1, out1, np.where(case2, out2, out3))
+    if theta2 < 1e-6:
+        theta1 = 0
+        theta3 = 2 * thetap - theta1
+    elif np.abs(theta2 - np.pi / 2) < 1e-6:
+        theta1 = 0
+        theta3 = 2 * thetam + theta1
+    else:
+        theta1 = thetap - thetam
+        theta3 = thetap + thetam
 
     if not_proper:
         theta3 = eps * theta3
@@ -140,7 +151,9 @@ def as_euler(seq: str, quat: np.ndarray, degrees: bool = False):
     theta1 = (theta1 + np.pi) % (2 * np.pi) - np.pi
     theta3 = (theta3 + np.pi) % (2 * np.pi) - np.pi
 
-    return np.stack([theta1, theta2, theta3], axis=-1)
+    out[0] = theta1
+    out[1] = theta2
+    out[2] = theta3
 
 
 def slerp(q0, q1, t):
@@ -196,6 +209,26 @@ def multiply(q0, q1):
     return out
 
 
+@nb.guvectorize([(nb.float64[:], nb.float64[:, :])], "(m),(n, n)")
+def rotation_matrix_nb(Q, mat):
+    w = Q[0]
+    x = Q[1]
+    y = Q[2]
+    z = Q[3]
+
+    mat[0, 0] = 1.0 - 2.0 * y * y - 2.0 * z * z
+    mat[0, 1] = 2.0 * x * y - 2.0 * z * w
+    mat[0, 2] = 2.0 * x * z + 2.0 * y * w
+
+    mat[1, 0] = 2.0 * x * y + 2.0 * z * w
+    mat[1, 1] = 1.0 - 2.0 * x * x - 2.0 * z * z
+    mat[1, 2] = 2.0 * y * z - 2.0 * x * w
+
+    mat[2, 0] = 2.0 * x * z - 2.0 * y * w
+    mat[2, 1] = 2.0 * y * z + 2.0 * x * w
+    mat[2, 2] = 1.0 - 2.0 * x * x - 2.0 * y * y
+
+
 def rotation_matrix(Q):
     """
     Covert a quaternion into a full three-dimensional rotation matrix.
@@ -205,25 +238,6 @@ def rotation_matrix(Q):
     :return:
         A (Nx)3x3 element matrix representing the 3D rotation.
     """
-    Q = np.asarray(Q)
-
-    w = Q[..., 0]
-    x = Q[..., 1]
-    y = Q[..., 2]
-    z = Q[..., 3]
-
-    mat = np.zeros(Q.shape[:-1] + (3, 3), dtype=Q.dtype)
-
-    mat[..., 0, 0] = 1.0 - 2.0 * y * y - 2.0 * z * z
-    mat[..., 0, 1] = 2.0 * x * y - 2.0 * z * w
-    mat[..., 0, 2] = 2.0 * x * z + 2.0 * y * w
-
-    mat[..., 1, 0] = 2.0 * x * y + 2.0 * z * w
-    mat[..., 1, 1] = 1.0 - 2.0 * x * x - 2.0 * z * z
-    mat[..., 1, 2] = 2.0 * y * z - 2.0 * x * w
-
-    mat[..., 2, 0] = 2.0 * x * z - 2.0 * y * w
-    mat[..., 2, 1] = 2.0 * y * z + 2.0 * x * w
-    mat[..., 2, 2] = 1.0 - 2.0 * x * x - 2.0 * y * y
-
-    return mat
+    out = np.empty(Q.shape[:-1] + (3, 3), dtype=Q.dtype)
+    rotation_matrix_nb(np.asarray(Q), out)
+    return out
