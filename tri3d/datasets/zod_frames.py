@@ -6,8 +6,7 @@ from typing import List
 import numpy as np
 from PIL import Image
 
-from .. import geometry
-from .. import misc
+from .. import geometry, misc
 from .dataset import Box, Dataset
 
 
@@ -207,14 +206,14 @@ class ZODFrames(Dataset):
 
         return out
 
-    def sequences(self) -> List[int]:
+    def sequences(self):
         """Return the list of sequences/recordings indices (0..num_sequences)."""
         return list(range(len(self.metadata)))
 
     def timestamps(self, seq, sensor):
         return self._timelines[seq][sensor]
 
-    def image(self, seq: int, frame: int = 0, sensor: str = "img_front") -> Image:
+    def image(self, seq: int, frame: int = 0, sensor: str = "img_front"):
         sensor = sensor.removeprefix("img_") + "_" + self.anon_method
         filepath = self.metadata[seq]["camera_frames"][sensor][frame]["filepath"]
         return Image.open(self.root / filepath)

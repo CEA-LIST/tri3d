@@ -463,6 +463,10 @@ class Dataset(AbstractDataset):
                 )
 
             return out
+        
+        # Don't interpolate if only one frame is annotated (ex: ZOD frames)
+        if len(boxes_timestamps) < 2:
+            return []
 
         # filter on boxes visible at i1 or i2
         i1, i2 = misc.lr_bisect(boxes_timestamps, sensor_ts)
