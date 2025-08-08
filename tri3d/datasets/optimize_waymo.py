@@ -1,17 +1,23 @@
-"""Re-encode Waymo parquet files with better settings to optimize random access."""
+"""Re-encode Waymo parquet files with better settings to optimize random access.
+
+The script can be called again if it is stopped or crashes, it will skip 
+already converted files.
+It will use **a lot** of RAM.
+"""
 
 import argparse
 import os
+import pathlib
+import random
 from concurrent.futures import ProcessPoolExecutor
-import gc
 
 import pyarrow
+import pyarrow.compute as pc
 import pyarrow.dataset
 import pyarrow.parquet as pq
-import pyarrow.compute as pc
+import tqdm
 
-
-sorting_columns = {
+SORTING_COLUMNS = {
     "lidar_segmentation": ["key.frame_timestamp_micros", "key.laser_name"],
     "projected_lidar_box": [
         "key.frame_timestamp_micros",
@@ -45,7 +51,7 @@ sorting_columns = {
 
 
 # Compress text and range image columns
-compressed_columns = [
+COMPRESSED_COLUMNS = [
     "[CameraSegmentationLabelComponent].sequence_id",
     "[LiDARCameraProjectionComponent].range_image_return1.values",
     "[LiDARCameraProjectionComponent].range_image_return2.values",
@@ -64,72 +70,74 @@ compressed_columns = [
 ]
 
 
-def convert_file(task):
-    pyarrow.set_cpu_count(4)
-    pyarrow.jemalloc_set_decay_ms(0)
-
-    source, destination = task
-    print(source)
+def convert_file(source: pathlib.Path, destination: pathlib.Path):
     destdir = os.path.dirname(destination)
     if not os.path.exists(destdir):
         os.makedirs(destdir, exist_ok=True)
+
+    tmpdest = destination.parent / (destination.name + ".tmp")
 
     record_type = os.path.basename(os.path.dirname(source))
 
     ds = pyarrow.dataset.dataset(source)
     order = pc.sort_indices(
-        ds.to_table(sorting_columns[record_type]),
-        sort_keys=[(c, "ascending") for c in sorting_columns[record_type]],
+        ds.to_table(SORTING_COLUMNS[record_type]),
+        sort_keys=[(c, "ascending") for c in SORTING_COLUMNS[record_type]],
     ).to_numpy()
 
     table = pyarrow.dataset.dataset(source).take(order)
 
-    gc.collect()
-    pyarrow.default_memory_pool().release_unused()
-
     pq.write_table(
         table,
-        destination,
+        tmpdest,
         row_group_size=(
             2 if record_type in ["lidar", "camera_image", "lidar_pose"] else 1024
         ),
-        compression={
-            c + (".list.element" if c.endswith(".values") else ""): "BROTLI"
-            if c in compressed_columns
-            else "NONE"
-            for c in table.schema.names
-        },
+        # compression={
+        #     c + (".list.element" if c.endswith(".values") else ""): "BROTLI"
+        #     if c in COMPRESSED_COLUMNS
+        #     else "NONE"
+        #     for c in table.schema.names
+        # },
+        compression="ZSTD",
         sorting_columns=[
             pq.SortingColumn(table.schema.names.index(c))
-            for c in sorting_columns[record_type]
+            for c in SORTING_COLUMNS[record_type]
         ],
     )
 
-
-def list_files(input, output):
-    for split in os.listdir(input):
-        for record in os.listdir(os.path.join(input, split)):
-            for filename in os.listdir(os.path.join(input, split, record)):
-                if filename.endswith(".parquet"):
-                    yield (
-                        os.path.join(input, split, record, filename),
-                        os.path.join(output, split, record, filename),
-                    )
+    tmpdest.rename(destination)
 
 
 def main():
     argparser = argparse.ArgumentParser(description=__doc__)
-    argparser.add_argument("input", help="path to the original dataset")
-    argparser.add_argument("output", help="path to the converted dataset")
+    argparser.add_argument(
+        "--input", type=pathlib.Path, help="path to the original dataset"
+    )
+    argparser.add_argument(
+        "--output", type=pathlib.Path, help="path to the converted dataset"
+    )
     argparser.add_argument(
         "--workers", "-w", type=int, default=4, help="number of parallel workers"
     )
     args = argparser.parse_args()
 
+    sources: list[pathlib.Path] = list(args.input.glob("**/*.parquet"))
+    random.shuffle(sources)
+
+    destinations = [args.output / s.relative_to(args.input) for s in sources]
+
+    keep = [i for i, d in enumerate(destinations) if not d.exists()]
+    sources = [sources[k] for k in keep]
+    destinations = [destinations[k] for k in keep]
+
     with ProcessPoolExecutor(
         max_workers=args.workers, max_tasks_per_child=1
     ) as executor:
-        list(executor.map(convert_file, list_files(args.input, args.output)))
+        for _ in tqdm.tqdm(
+            executor.map(convert_file, sources, destinations), total=len(sources)
+        ):
+            pass
 
 
 if __name__ == "__main__":
