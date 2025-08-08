@@ -1,0 +1,7 @@
+﻿Once
+====
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Once
+    :inherited-members:

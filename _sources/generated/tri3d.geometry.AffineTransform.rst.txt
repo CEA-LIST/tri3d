@@ -1,0 +1,7 @@
+﻿AffineTransform
+===============
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: AffineTransform
+    :inherited-members:

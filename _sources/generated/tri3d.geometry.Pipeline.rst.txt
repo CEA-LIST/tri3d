@@ -1,0 +1,7 @@
+﻿Pipeline
+========
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: Pipeline
+    :inherited-members:

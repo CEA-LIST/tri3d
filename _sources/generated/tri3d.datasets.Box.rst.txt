@@ -1,0 +1,7 @@
+﻿Box
+===
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Box
+    :inherited-members:
