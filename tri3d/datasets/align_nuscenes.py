@@ -4,6 +4,7 @@ import argparse
 import functools
 import json
 import os
+import pathlib
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -15,9 +16,9 @@ from torch.optim import SGD, AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-import tri3d
-from tri3d.datasets import NuScenes
-from tri3d.geometry import RigidTransform, as_matrix
+from ..geometry import RigidTransform, as_matrix
+from ..misc import lr_bisect
+from .nuscenes import NuScenes
 
 
 def subsample(xyz: Tensor, bin_size=0.075):
@@ -34,7 +35,6 @@ def subsample(xyz: Tensor, bin_size=0.075):
     return out
 
 
-# @torch.compile(fullgraph=True)
 def correction_matrix(dr, dz):
     """Convert variables to a 4x4 transformation matrix."""
     cx = torch.cos(dr[0])
@@ -67,6 +67,7 @@ def icp(
     lr_scheduler = OneCycleLR(optimizer=optimizer, max_lr=lr, total_steps=total_steps)
 
     xyz_source_ = xyz_source @ init_transform[:3, :3].T + init_transform[:3, 3]
+    nn = torch_cluster.nearest(xyz_source_, xyz_target)
 
     for it in range(total_steps):
         fix_transform = correction_matrix(dr, dz)
@@ -74,7 +75,7 @@ def icp(
 
         xyz_source_ = xyz_source @ t[:3, :3].T + t[:3, 3]
 
-        if it % 10 == 0:
+        if it > 0 and it % 10 == 0:
             nn = torch_cluster.nearest(xyz_source_, xyz_target)
 
         dist = xyz_source_ - xyz_target[nn]
@@ -97,9 +98,8 @@ def icp(
 
     with torch.no_grad():
         fix_transform = correction_matrix(dr, dz)
-        fitness = (dist * inliners).sum() / inliners.sum().clamp_min(1)
 
-    return init_transform @ fix_transform, fitness
+    return init_transform @ fix_transform
 
 
 def aggregate_points(
@@ -149,7 +149,6 @@ def build_pose_graph(dataset: NuScenes, seq, stride=5, window=7, device="cuda"):
 
     n_pcds = len(dataset.timestamps(seq, "LIDAR_TOP"))
     graph = {}
-    graph_losses = {}
 
     for source_id in range(0, n_pcds, stride):
         for target_id in range(
@@ -174,12 +173,10 @@ def build_pose_graph(dataset: NuScenes, seq, stride=5, window=7, device="cuda"):
                 .to(device, non_blocking=True)
             )
 
-            transform, fitness = icp(xyz_source, xyz_target, init_transform)
+            transform = icp(xyz_source, xyz_target, init_transform)
             transform = transform.cpu()
-            fitness = fitness.item()
 
             graph[(source_id, target_id)] = transform
-            graph_losses[(source_id, target_id)] = fitness
 
     return graph
 
@@ -216,7 +213,7 @@ def bundle_adjustment(dataset: NuScenes, seq, graph: dict[tuple[int, int], Tenso
 
         icp_losses = [torch.stack(l) for l in icp_losses.values()]
         icp_losses = [
-            torch.sum(l * l.le(max(l.detach().min(), 1e-6))) for l in icp_losses
+            torch.sum(l * l.le(l.detach().min().clamp_min(1e-6))) for l in icp_losses
         ]
         icp_loss = sum(icp_losses)
 
@@ -235,7 +232,7 @@ def bundle_adjustment(dataset: NuScenes, seq, graph: dict[tuple[int, int], Tenso
         total_loss.backward()
 
         for p in poses.values():
-            p.grad.data *= grad_mask
+            p.grad.data *= grad_mask  # type: ignore
 
         optimizer.step()
         lr_scheduler.step()
@@ -279,7 +276,7 @@ def fix_poses(dataset: NuScenes, seq, ego_pose, sample_annotation, device="cuda"
     for ep in ego_pose:
         t = ep["timestamp"]
         if t not in lidar_interp:
-            a, b = tri3d.misc.lr_bisect(lidar_timeline, t)
+            a, b = lr_bisect(lidar_timeline, t)
             w = (t - lidar_timeline[a]) / (lidar_timeline[b] - lidar_timeline[a])
             lidar_interp[t] = RigidTransform.interpolate(
                 lidar_poses[a], lidar_poses[b], w
@@ -299,24 +296,13 @@ def fix_poses(dataset: NuScenes, seq, ego_pose, sample_annotation, device="cuda"
     for sa in sample_annotation:
         t = sa.pop("sample_timestamp")
 
-        # if t not in old_interp:
-        #     a, b = tri3d.misc.lr_bisect(old_timeline, t)
-        #     w = (t - old_timeline[a]) / (old_timeline[b] - old_timeline[a])
-        #     old_interp[t] = RigidTransform.interpolate(
-        #         old_ego_poses[a], old_ego_poses[b], w
-        #     )
-        # if t not in lidar_interp:
-        #     a, b = tri3d.misc.lr_bisect(lidar_timeline, t)
-        #     w = (t - lidar_timeline[a]) / (lidar_timeline[b] - lidar_timeline[a])
-        #     lidar_interp[t] = RigidTransform.interpolate(
-        #         lidar_poses[a], lidar_poses[b], w
-        #     )
-
         obj2world = RigidTransform(sa["rotation"], sa["translation"])
         world2ego_old = old_interp[t].inv()
         lidar2world_new = lidar_interp[t]
 
-        obj2world_new = lidar2world_new @ ego2lidar @ world2ego_old @ obj2world
+        obj2world_new: RigidTransform = (
+            lidar2world_new @ ego2lidar @ world2ego_old @ obj2world
+        )  # type: ignore
 
         sample_annotation_new.append(
             sa
@@ -331,13 +317,17 @@ def fix_poses(dataset: NuScenes, seq, ego_pose, sample_annotation, device="cuda"
 
 def main():
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--root")
-    argparser.add_argument("--subset")
-    argparser.add_argument("--out")
+    argparser.add_argument(
+        "--root", type=pathlib.Path, required=True, help="dataset root dir"
+    )
+    argparser.add_argument(
+        "--subset", required=True, help="split name (ex: 'v1.0-mini')"
+    )
+    argparser.add_argument("--out", type=pathlib.Path, required=True, help="output dir")
     argparser.add_argument("--workers", type=int, default=1)
     args = argparser.parse_args()
 
-    dataset = tri3d.datasets.NuScenes(args.root, args.subset)
+    dataset = NuScenes(args.root, args.subset)
 
     sample_seq = {
         sample_t: seq
@@ -345,19 +335,24 @@ def main():
         for sample_t in dataset.sample_tokens(seq)
     }
 
-    with open(os.path.join(dataset.root, dataset.subset, "sample.json"), "rb") as f:
-        sample = {s["token"]: s for s in json.load(f)}
+    with open(dataset.root / dataset.subset / "sample.json", "rb") as f:
+        sample = json.load(f)
 
-    with open(os.path.join(dataset.root, dataset.subset, "ego_pose.json"), "rb") as f:
-        ego_pose = {ep["token"]: ep for ep in json.load(f)}
+    sample_dict = {s["token"]: s for s in sample}
+
+    with open(dataset.root / dataset.subset / "ego_pose.json", "rb") as f:
+        ego_pose = json.load(f)
+
+    ego_pose_dict = {ep["token"]: ep for ep in ego_pose}
+
+    with open(dataset.root / dataset.subset / "sample_annotation.json", "rb") as f:
+        sample_annotation = json.load(f)
 
     ego_pose_per_scene = [[] for _ in dataset.sequences()]
-    with open(
-        os.path.join(dataset.root, dataset.subset, "sample_data.json"), "rb"
-    ) as f:
+    with open(dataset.root / dataset.subset / "sample_data.json", "rb") as f:
         for sd in json.load(f):
             seq = sample_seq[sd["sample_token"]]
-            ep = ego_pose[sd["ego_pose_token"]]
+            ep = ego_pose_dict[sd["ego_pose_token"]]
             ego_pose_per_scene[seq].append(ep)
 
     # sort sample data by timestamps
@@ -366,13 +361,10 @@ def main():
     ]
 
     sample_annotation_per_scene = [[] for _ in dataset.sequences()]
-    with open(
-        os.path.join(dataset.root, dataset.subset, "sample_annotation.json"), "rb"
-    ) as f:
-        for sa in json.load(f):
-            seq = sample_seq[sa["sample_token"]]
-            st = sample[sa["sample_token"]]["timestamp"]
-            sample_annotation_per_scene[seq].append(sa | {"sample_timestamp": st})
+    for sa in sample_annotation:
+        seq = sample_seq[sa["sample_token"]]
+        st = sample_dict[sa["sample_token"]]["timestamp"]
+        sample_annotation_per_scene[seq].append(sa | {"sample_timestamp": st})
 
     ego_pose_new = []
     sample_annotation_new = []
@@ -385,18 +377,47 @@ def main():
                 ego_pose_per_scene,
                 sample_annotation_per_scene,
             ),
-            total=len(sequences)
+            total=len(sequences),
         ):
             ego_pose_new.extend(epn)
             sample_annotation_new.extend(san)
 
-        os.makedirs(args.out, exist_ok=True)
+    # Reorder like the original data to facilitate diffs
+    ego_pose_new = {ep["token"]: ep for ep in ego_pose_new}
+    ego_pose_new = [ego_pose_new[ep["token"]] for ep in ego_pose]
 
-        with open(os.path.join(args.out, "ego_pose.json"), "w") as f:
-            json.dump(ego_pose_new, f)
+    sample_annotation_new = {sa["token"]: sa for sa in sample_annotation_new}
+    sample_annotation_new = [
+        sample_annotation_new[ep["token"]] for ep in sample_annotation
+    ]
 
-        with open(os.path.join(args.out, "sample_annotation.json"), "w") as f:
-            json.dump(sample_annotation_new, f)
+    # Generate RFC 6902 JSON patch
+    ego_pose_patch = [
+        {"op": "replace", "path": f"/{i}/{k}", "value": b[k]}
+        for i, (a, b) in enumerate(zip(ego_pose_dict, ego_pose_new))
+        for k in a.keys()
+        if a[k] != b[k]
+    ]
+
+    sample_annotation_patch = [
+        {"op": "replace", "path": f"/{i}/{k}", "value": b[k]}
+        for i, (a, b) in enumerate(zip(sample_annotation, sample_annotation_new))
+        for k in a.keys()
+        if a[k] != b[k]
+    ]
+
+    # Save
+    os.makedirs(args.out, exist_ok=True)
+
+    with open(args.out / "ego_pose.json", "w") as f:
+        json.dump(ego_pose_new, f)
+    with open(args.out / "ego_pose.patch.json", "w") as f:
+        json.dump(ego_pose_patch, f)
+
+    with open(args.out / "sample_annotation.json", "w") as f:
+        json.dump(sample_annotation_new, f)
+    with open(args.out / "sample_annotation.patch.json", "w") as f:
+        json.dump(sample_annotation_patch, f)
 
 
 if __name__ == "__main__":
