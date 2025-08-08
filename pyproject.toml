@@ -16,18 +16,23 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 plot = ["matplotlib", "k3d"]
-jupyter = ["ipykernel", "ipywidgets", "ipympl"]
-doc = ["sphinx", "nbsphinx", "furo"]
-test = ["scipy>=1.6.0", "sphinx", "nbsphinx", "furo"]
-nuscenes_icp = ["torch", "torch-cluster", "tqdm"]
+align_nuscenes = ["torch", "torch-cluster", "tqdm"]
 
 [tool.setuptools]
 packages = ["tri3d"]
 
 [tool.setuptools_scm]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.coverage.report]
-exclude_lines = ["@abstractmethod", "raise NotImplementedError", "__repr__"]
+exclude_lines = [
+    "@abstractmethod",
+    "__repr__",
+    "raise ValueError",
+    "raise NotImplementedError",
+]
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
