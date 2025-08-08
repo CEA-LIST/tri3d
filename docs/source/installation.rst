@@ -13,4 +13,4 @@ To use plotting helpers, install the optional dependencies as well:
 
 .. code-block::
     
-   pip install tri3d[plot,jupyter]
+   pip install tri3d[plot]

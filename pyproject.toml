@@ -45,3 +45,18 @@ format = "flat"
 [tool.uv.sources]
 torch-scatter = { index = "pyg" }
 torch-cluster = { index = "pyg" }
+
+[dependency-groups]
+dev = [
+    "furo",
+    "ipykernel",
+    "ipympl",
+    "ipywidgets",
+    "nbsphinx",
+    "nbstripout",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "scipy",
+    "sphinx",
+]
