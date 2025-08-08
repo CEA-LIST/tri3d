@@ -11,8 +11,8 @@ Datasets
    :template: base.rst
 
    Box
-   KITTIObject
    NuScenes
    Once
+   SemanticKITTI
    Waymo
    ZODFrames
