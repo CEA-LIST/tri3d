@@ -153,7 +153,7 @@ class NuScenes(Dataset):
             sample_data[sample_data_t]["lidarseg_filename"] = lidarseg_v["filename"]
 
         for panoptic_v in panoptic:
-            sample_data_t = lidarseg_v["sample_data_token"]
+            sample_data_t = panoptic_v["sample_data_token"]
             sample_data[sample_data_t]["panoptic_filename"] = panoptic_v["filename"]
 
         # group sample tokens by scenes
@@ -203,7 +203,9 @@ class NuScenes(Dataset):
                 attribute[t]["name"] for t in sample_annotation_v["attribute_tokens"]
             ]
             if "visibility_t" in sample_annotation_v is None:
-                visibility = visibility[sample_annotation_v["visibility_t"]]["level"]
+                box_visibility = visibility[sample_annotation_v["visibility_t"]][
+                    "level"
+                ]
             else:
                 box_visibility = None
             width, length, height = sample_annotation_v["size"]
