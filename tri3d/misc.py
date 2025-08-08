@@ -1,12 +1,11 @@
-import logging
-import weakref
 import functools
 import inspect
+import logging
+import weakref
 from collections import OrderedDict
 from typing import Callable, ParamSpec, TypeVar
 
 import numpy as np
-
 
 logger = logging.getLogger(".".join(__name__.split(".")[:-1]))
 

@@ -1,8 +1,16 @@
 import pathlib
 
 import numpy as np
-from tri3d.datasets import AbstractDataset, KITTIObject, NuScenes, Once, Waymo, ZODFrames
 import pytest
+
+from tri3d.datasets import (
+    AbstractDataset,
+    KITTIObject,
+    NuScenes,
+    Once,
+    Waymo,
+    ZODFrames,
+)
 
 
 @pytest.fixture(scope="module", params=[KITTIObject, NuScenes, Once, Waymo, ZODFrames])
@@ -41,6 +49,7 @@ def test_timestamps(dataset):
     for s in dataset.pcl_sensors + dataset.cam_sensors + dataset.img_sensors:
         frames = dataset.frames(sequences[0], sensor=s)
         timestamps = dataset.timestamps(sequences[0], sensor=s)
+        assert isinstance(timestamps, np.ndarray)
         assert len(frames) == len(timestamps)
         assert np.all(timestamps == np.sort(timestamps))
 

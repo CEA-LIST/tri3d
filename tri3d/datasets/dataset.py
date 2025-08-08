@@ -1,13 +1,13 @@
 import dataclasses
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Union
 from numbers import Integral
+from typing import List, Tuple, Union
 
 import numpy as np
 from PIL.Image import Image
 
-from ..geometry import Transformation, RigidTransform
 from .. import misc
+from ..geometry import RigidTransform, Transformation
 
 
 @dataclasses.dataclass(frozen=True)

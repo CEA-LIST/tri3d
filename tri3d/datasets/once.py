@@ -2,13 +2,12 @@ import json
 import pathlib
 
 import numpy as np
-
 import PIL.Image
 
 from ..geometry import (
     CameraProjection,
-    Rotation,
     RigidTransform,
+    Rotation,
     Translation,
 )
 from .dataset import Box, Dataset

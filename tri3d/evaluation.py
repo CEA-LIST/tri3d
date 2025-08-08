@@ -14,21 +14,22 @@ from .geometry import approx_kitti_bbox2d
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
-_evaluate_executable = path.abspath(path.join(
-    path.dirname(__file__), "bin", "evaluate_object_3d_offline"))
+_evaluate_executable = path.abspath(
+    path.join(path.dirname(__file__), "bin", "evaluate_object_3d_offline")
+)
 
 
 def _write_kitti_annotation_file(filename, annotations, label_map=None):
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
         for a in annotations:
-            if hasattr(a, 'bbox') and a.bbox is not None:
+            if hasattr(a, "bbox") and a.bbox is not None:
                 u1, j1, u2, j2 = a.bbox
             else:
                 u1, j1, u2, j2 = approx_kitti_bbox2d(a.position, a.size, a.heading)
             l, w, h = a.size
             x, y, z = a.position
             y += h / 2
-            heading = - a.heading
+            heading = -a.heading
             f.write(
                 f"{label_map[a.label] if label_map is not None else a.label} "
                 f"{getattr(a, 'truncated', -1):.2f} "
@@ -37,14 +38,15 @@ def _write_kitti_annotation_file(filename, annotations, label_map=None):
                 f"{u1:.2f} {j1:.2f} {u2:.2f} {j2:.2f} "
                 f"{h:.2f} {w:.2f} {l:.2f} "
                 f"{x:.2f} {y:.2f} {z:.2f} "
-                f"{heading:.2f}"
-                + (f" {a.score}\n" if hasattr(a, 'score') else "\n"))
+                f"{heading:.2f}" + (f" {a.score}\n" if hasattr(a, "score") else "\n")
+            )
 
 
 KITTIObjectDet = namedtuple(
-    'KITTIObjectDet',
-    ['position', 'size', 'heading', 'label', 'score', 'bbox'],
-    defaults=[None])
+    "KITTIObjectDet",
+    ["position", "size", "heading", "label", "score", "bbox"],
+    defaults=[None],
+)
 
 
 def eval_kitti_det(predictions, groundtruths, label_map=None, out_dir=None):
@@ -98,48 +100,55 @@ def eval_kitti_det(predictions, groundtruths, label_map=None, out_dir=None):
         _write_kitti_annotation_file(
             filename=path.join(gt_dir, f"{i:06d}.txt"),
             annotations=annotations,
-            label_map=label_map)
+            label_map=label_map,
+        )
 
     for i, annotations in enumerate(predictions):
         _write_kitti_annotation_file(
             filename=path.join(result_dir, "data", f"{i:06d}.txt"),
             annotations=annotations,
-            label_map=label_map)
+            label_map=label_map,
+        )
 
     # Override plotting programs with fake ones to skip plotting
-    if not path.exists(path.join(out_dir, 'bin')):
-        os.makedirs(path.join(out_dir, 'bin'))
-        os.symlink('/bin/true', path.join(out_dir, 'bin', 'gnuplot'))
-        os.symlink('/bin/true', path.join(out_dir, 'bin', 'ps2pdf'))
-        os.symlink('/bin/true', path.join(out_dir, 'bin', 'pdfcrop'))
+    if not path.exists(path.join(out_dir, "bin")):
+        os.makedirs(path.join(out_dir, "bin"))
+        os.symlink("/bin/true", path.join(out_dir, "bin", "gnuplot"))
+        os.symlink("/bin/true", path.join(out_dir, "bin", "ps2pdf"))
+        os.symlink("/bin/true", path.join(out_dir, "bin", "pdfcrop"))
 
     # Run evaluation program
-    os.environ['PATH'] = path.join(out_dir, 'bin') + ":" + os.environ['PATH']
-    proc = subprocess.run([_evaluate_executable, gt_dir, result_dir],
-                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    os.environ['PATH'] = ":".join(os.environ['PATH'].split(":")[1:])
+    os.environ["PATH"] = path.join(out_dir, "bin") + ":" + os.environ["PATH"]
+    proc = subprocess.run(
+        [_evaluate_executable, gt_dir, result_dir],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    os.environ["PATH"] = ":".join(os.environ["PATH"].split(":")[1:])
     if proc.returncode != 0:
-        raise RuntimeError(f"evaluation script error ({proc.returncode}):\n"
-                           f"{proc.stdout}")
+        raise RuntimeError(
+            f"evaluation script error ({proc.returncode}):\n" f"{proc.stdout}"
+        )
 
     results = {}
-    for c in ['car', 'pedestrian', 'cyclist']:
+    for c in ["car", "pedestrian", "cyclist"]:
         filename = path.join(result_dir, f"stats_{c.lower()}_detection_3d.txt")
         try:
             easy, moderate, hard = np.loadtxt(filename)
         except IOError:
             zero = np.zeros(41)
-            results[c + "_3d"] = {'easy': zero, 'moderate': zero, 'hard': zero}
+            results[c + "_3d"] = {"easy": zero, "moderate": zero, "hard": zero}
         else:
-            results[c + "_3d"] = {'easy': easy, 'moderate': moderate, 'hard': hard}
+            results[c + "_3d"] = {"easy": easy, "moderate": moderate, "hard": hard}
 
         filename = path.join(result_dir, f"stats_{c.lower()}_detection_ground.txt")
         try:
             easy, moderate, hard = np.loadtxt(filename)
         except IOError:
             zero = np.zeros(41)
-            results[c + "_ground"] = {'easy': zero, 'moderate': zero, 'hard': zero}
+            results[c + "_ground"] = {"easy": zero, "moderate": zero, "hard": zero}
         else:
-            results[c + "_ground"] = {'easy': easy, 'moderate': moderate, 'hard': hard}
+            results[c + "_ground"] = {"easy": easy, "moderate": moderate, "hard": hard}
 
     return results

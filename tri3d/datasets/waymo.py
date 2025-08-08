@@ -5,11 +5,9 @@ from typing import List, Optional
 
 import numpy as np
 import pyarrow.parquet as pq
-
 from PIL import Image
 
 from .. import geometry
-
 from .dataset import Box, Dataset
 
 
@@ -61,7 +59,7 @@ class Waymo(Dataset):
     The timestamps for cameras refer to the pose timestamp in raw waymo data.
     Other temporal information such as trigger timestamps are not exposed.
 
-    :ref:`instances2d` returns global ids[1]_ which are consistent between 
+    :ref:`instances2d` returns global ids[1]_ which are consistent between
     frames. They are not common with the tracking and 3D annotations.
 
     :meth:`Waymo.frames` supports an extra sensor name `'SEG_LIDAR_TOP'` where

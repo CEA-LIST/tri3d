@@ -2,15 +2,15 @@ import itertools
 
 import numpy as np
 import pytest
-from tri3d.geometry import (
-    AffineTransform,
-    Rotation,
-    Translation,
-    RigidTransform,
-    Pipeline,
-)
 from scipy.spatial.transform import Rotation as SPRotation
 
+from tri3d.geometry import (
+    AffineTransform,
+    Pipeline,
+    RigidTransform,
+    Rotation,
+    Translation,
+)
 
 rnd_seed = 0
 transform_classes = (AffineTransform, Rotation, Translation, RigidTransform, Pipeline)
