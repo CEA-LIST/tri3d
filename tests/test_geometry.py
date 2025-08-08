@@ -6,6 +6,7 @@ from scipy.spatial.transform import Rotation as SPRotation
 
 from tri3d.geometry import (
     AffineTransform,
+    CameraProjection,
     Pipeline,
     RigidTransform,
     Rotation,
@@ -13,7 +14,14 @@ from tri3d.geometry import (
 )
 
 rnd_seed = 0
-transform_classes = (AffineTransform, Rotation, Translation, RigidTransform, Pipeline)
+transform_classes = (
+    AffineTransform,
+    CameraProjection,
+    Pipeline,
+    RigidTransform,
+    Rotation,
+    Translation,
+)
 
 
 def equal_quat(q1, q2):
@@ -33,6 +41,22 @@ def gen_args(cls, shape):
         mat[..., 3, :] = 0
         mat[..., 3, 3] = 1
         return (mat,)
+    elif issubclass(cls, CameraProjection):
+        model = ["pinhole", "kannala"][np.random.randint(0, 1)]
+        if model == "pinhole":
+            intrinsics = np.random.rand(*shape, 9)
+        else:
+            intrinsics = np.random.rand(*shape, 8)
+        model = ["pinhole", "kannala"][np.random.randint(0, 1)]
+        return model, intrinsics
+    elif issubclass(cls, Pipeline):
+        quat, vec = np.split(np.random.randn(*shape, 7), [4], axis=-1)
+        quat /= np.linalg.norm(quat, axis=-1, keepdims=True)
+        return Translation(vec), Rotation(quat)
+    elif issubclass(cls, RigidTransform):
+        quat, vec = np.split(np.random.randn(*shape, 7), [4], axis=-1)
+        quat /= np.linalg.norm(quat, axis=-1, keepdims=True)
+        return quat, vec
     elif issubclass(cls, Rotation):
         quat = np.random.randn(*shape, 4)
         quat = quat / np.linalg.norm(quat, axis=-1, keepdims=True)
@@ -40,18 +64,12 @@ def gen_args(cls, shape):
     elif issubclass(cls, Translation):
         vec = np.random.randn(*shape, 3)
         return (vec,)
-    elif issubclass(cls, RigidTransform):
-        quat, vec = np.split(np.random.randn(*shape, 7), [4], axis=-1)
-        quat /= np.linalg.norm(quat, axis=-1, keepdims=True)
-        return quat, vec
-    elif issubclass(cls, Pipeline):
-        quat, vec = np.split(np.random.randn(*shape, 7), [4], axis=-1)
-        quat /= np.linalg.norm(quat, axis=-1, keepdims=True)
-        return Translation(vec), Rotation(quat)
+    else:
+        raise ValueError()
 
 
 def test_affine():
-    (mat,) = gen_args(AffineTransform, [])
+    mat, = gen_args(AffineTransform, [])
     transform = AffineTransform(mat)
     pts = np.random.randn(3)
 
@@ -59,6 +77,10 @@ def test_affine():
     expected = mat[:3, :3] @ pts + mat[:3, 3]
 
     assert actual == pytest.approx(expected)
+
+
+def test_camera_projection():
+    transform = CameraProjection("pinhole", ())
 
 
 def test_rotation():
@@ -131,10 +153,13 @@ def test_inv(transform_cls, t_shape):
     point = np.random.randn(10, 3)
     args = gen_args(transform_cls, t_shape)
     transform = transform_cls(*args)
-    transform_inv = transform.inv()
+    try:
+        transform_inv = transform.inv()
+    except NotImplementedError:
+        pytest.skip(f"{transform_cls} does not implement inv()")
+        return
 
     actual = transform_inv.apply(transform.apply(point))
-
     assert actual == pytest.approx(point)
 
 

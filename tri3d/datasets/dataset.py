@@ -1,7 +1,6 @@
 import dataclasses
 from abc import ABC, abstractmethod
-from numbers import Integral
-from typing import List, Tuple, Union
+from typing import Sequence
 
 import numpy as np
 from PIL.Image import Image
@@ -35,9 +34,6 @@ class Box:
     label: str
     "Annotated object class"
 
-    def __iter__(self):
-        yield from dataclasses.astuple(self)
-
 
 class AbstractDataset(ABC):
     """Abstract class for driving datasets.
@@ -47,30 +43,28 @@ class AbstractDataset(ABC):
     the timeline and spatial coordinate systems.
     """
 
-    cam_sensors: List[str]
+    cam_sensors: list[str]
     """Camera names."""
 
-    img_sensors: List[str]
+    img_sensors: list[str]
     """Camera names (image plane coordinate)."""
 
-    pcl_sensors: List[str]
+    pcl_sensors: list[str]
     """Point cloud sensor names."""
 
-    det_labels: List[str]
+    det_labels: list[str]
     """Detection labels."""
 
-    sem_labels: List[str]
+    sem_labels: list[str]
     """Segmentation labels."""
 
     @abstractmethod
-    def sequences(self) -> List[int]:
+    def sequences(self) -> list[int]:
         """Return the list of sequences/recordings indices (0..num_sequences)."""
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def frames(
-        self, seq: int | None = None, sensor: str | None = None
-    ) -> List[Tuple[int, int]]:
+    def frames(self, seq: int, sensor: str) -> np.ndarray:
         """Return the frames in the dataset or a particular sequence.
 
         :param seq:
@@ -81,10 +75,10 @@ class AbstractDataset(ABC):
             A list of (sequence, frame) index tuples sorted by sequence and
             frame.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def timestamps(self, seq: int, sensor: str | None = None) -> np.ndarray:
+    def timestamps(self, seq: int, sensor: str) -> np.ndarray:
         """Return the frame timestamps for a given sensor .
 
         :param seq:
@@ -96,7 +90,7 @@ class AbstractDataset(ABC):
 
         .. note:: frames are guarenteed to be sorted.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def poses(
@@ -117,15 +111,15 @@ class AbstractDataset(ABC):
         :return:
             Sensor poses as a batched transform.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def alignment(
         self,
         seq: int,
-        frame: Union[int, Tuple[int, int]],
-        coords: Union[str, Tuple[str, str]],
-    ):
+        frame: int | tuple[int, int],
+        coords: str | tuple[str, str],
+    ) -> Transformation:
         """Return the transformation from one coordinate system and timestamp to another.
 
         :param seq:
@@ -141,10 +135,10 @@ class AbstractDataset(ABC):
             A transformation that projects points from one coordinate
             system at one frame to another.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def image(self, seq: int, frame: int, sensor: str | None = None) -> Image:
+    def image(self, seq: int, frame: int, sensor: str) -> Image:
         """Return image from given camera at given frame.
 
         A default sensor (for instance a front facing camera) should be
@@ -157,11 +151,11 @@ class AbstractDataset(ABC):
         :param sensor:
             The image sensor to use.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def points(
-        self, seq: int, frame: int, sensor: str | None = None, coords: str | None = None
+        self, seq: int, frame: int, sensor: str, coords: str | None = None
     ) -> np.ndarray:
         """Return an array of 3D point coordinates from lidars.
 
@@ -185,10 +179,10 @@ class AbstractDataset(ABC):
             A NxD array where the first 3 columns are X, Y, Z point coordinates
             and the remaining ones are dataset-specific.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def boxes(self, seq: int, frame: int, coords: str | None = None) -> List[Box]:
+    def boxes(self, seq: int, frame: int, coords: str) -> Sequence[type[Box]]:
         """Return the 3D box annotations.
 
         This function will interpolate and transform annotations if necessary in order
@@ -203,7 +197,7 @@ class AbstractDataset(ABC):
         :return:
             A list of box annotations.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def rectangles(self, seq: int, frame: int):
@@ -218,7 +212,7 @@ class AbstractDataset(ABC):
         :return:
             A list of 2D annotations.
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def semantic(self, seq: int, frame: int, sensor: str):
@@ -233,10 +227,10 @@ class AbstractDataset(ABC):
         :return:
             array of pointwise class label
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def semantic2d(self, seq: int, frame: int):
+    def semantic2d(self, seq: int, frame: int, sensor: str):
         """Return pixelwise class annotations.
 
         :param seq:
@@ -246,10 +240,10 @@ class AbstractDataset(ABC):
         :return:
             array of pointwise class label
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def instances(self, seq: int, frame: int):
+    def instances(self, seq: int, frame: int, sensor: str):
         """Return pointwise instance ids.
 
         :param seq:
@@ -259,14 +253,14 @@ class AbstractDataset(ABC):
         :return:
             array of pointwise instance label
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def instances2d(self, seq: int, frame: int):
+    def instances2d(self, seq: int, frame: int, sensor: str):
         """Return pixelwise instance annotations.
 
         Background label pixels will contain -1. Other instance ids will follow
-        dataset-specific rules. 
+        dataset-specific rules.
 
         :param seq:
             Sequence index.
@@ -275,7 +269,7 @@ class AbstractDataset(ABC):
         :return:
             array of pointwise instance label
         """
-        raise NotImplementedError
+        ...
 
 
 class Dataset(AbstractDataset):
@@ -283,48 +277,35 @@ class Dataset(AbstractDataset):
     # You should probably add cache (misc.memoize_method) over frequently called
     # methods.
 
-    cam_sensors: List[str]
-    img_sensors: List[str]
-    pcl_sensors: List[str]
-    det_labels: List[str]
-    sem_labels: List[str]
+    cam_sensors: list[str]
+    img_sensors: list[str]
+    pcl_sensors: list[str]
+    det_labels: list[str]
+    sem_labels: list[str]
 
     _nn_interp_thres = 0.05
     _default_cam_sensor: str
     _default_pcl_sensor: str
     _default_box_coords: str
 
-    def _calibration(self, seq: int, src_sensor: str, dst_sensor: str):
-        raise NotImplementedError
+    @abstractmethod
+    def _calibration(
+        self, seq: int, src_sensor: str, dst_sensor: str
+    ) -> Transformation: ...
 
-    def _poses(self, seq: int, sensor: str) -> RigidTransform:
-        raise NotImplementedError
+    @abstractmethod
+    def _poses(self, seq: int, sensor: str) -> RigidTransform: ...
 
-    def _points(self, seq: int, frame: int, sensor: str) -> np.ndarray:
-        raise NotImplementedError
+    @abstractmethod
+    def _points(self, seq: int, frame: int, sensor: str) -> np.ndarray: ...
 
-    def _boxes(self, seq: int) -> List[Box]:
-        raise NotImplementedError
+    @abstractmethod
+    def _boxes(self, seq: int) -> list[Box]: ...
 
-    def sequences(self):
-        raise NotImplementedError
+    def frames(self, seq, sensor):
+        return np.arange(len(self.timestamps(seq, sensor)))
 
-    def frames(self, seq: int | None = None, sensor: str | None = None):
-        if seq is None:
-            out = []
-            for seq in range(len(self.sequences())):
-                out += self.frames(seq, sensor)
-
-            return out
-
-        else:
-            return [(seq, i) for i in range(len(self.timestamps(seq, sensor)))]
-
-    def timestamps(self, seq: int, sensor: str):
-        # Must support all sensors and a virtual one for "boxes"
-        raise NotImplementedError
-
-    def poses(self, seq: int, sensor: str, timeline: str | None = None):
+    def poses(self, seq, sensor, timeline=None):
         if sensor in self.img_sensors:
             sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
@@ -339,7 +320,9 @@ class Dataset(AbstractDataset):
 
         else:  # use timeline sensor poses and calibration when available
             try:
-                tim_sensor_poses = self._calibration(seq, sensor, timeline)
+                tim_sensor_poses: RigidTransform = self._calibration(
+                    seq, sensor, timeline
+                )  # type: ignore
                 return self._poses(seq, timeline) @ tim_sensor_poses
             except ValueError:
                 pass
@@ -349,7 +332,8 @@ class Dataset(AbstractDataset):
             poses = self._poses(seq, sensor)
             poses_t = self.timestamps(seq, sensor)
         except ValueError:  # use imu and imu->sensor calib
-            poses = self._poses(seq, "ego") @ self._calibration(seq, sensor, "ego")
+            sensor2ego: RigidTransform = self._calibration(seq, sensor, "ego")  # type: ignore
+            poses = self._poses(seq, "ego") @ sensor2ego
             poses_t = self.timestamps(seq, "ego")
 
         dst_t = self.timestamps(seq, timeline)
@@ -361,11 +345,9 @@ class Dataset(AbstractDataset):
 
         return RigidTransform.interpolate(poses[i1], poses[i2], alpha)
 
-    def alignment(
-        self, seq: int, frame: int | tuple[int, int], coords: str | tuple[str, str]
-    ):
+    def alignment(self, seq, frame, coords) -> Transformation:
         # normalize arguments
-        if isinstance(frame, Integral):
+        if isinstance(frame, int):
             src_frame, dst_frame = frame, frame
         else:
             src_frame, dst_frame = frame
@@ -389,12 +371,10 @@ class Dataset(AbstractDataset):
             @ self.poses(seq, src_coords)[src_frame]
         )
 
-    def image(self, seq: int, frame: int, sensor: str):
+    def image(self, seq, frame, sensor):
         raise NotImplementedError
 
-    def points(
-        self, seq: int, frame: int, sensor: str | None = None, coords: str | None = None
-    ):
+    def points(self, seq, frame, sensor=None, coords=None) -> np.ndarray:
         if sensor is None:
             sensor = self._default_pcl_sensor
 
@@ -413,7 +393,7 @@ class Dataset(AbstractDataset):
             points[:, :3] = transform.apply(points[:, :3])
             return points
 
-    def boxes(self, seq: int, frame: int, coords: str | None = None):
+    def boxes(self, seq, frame, coords=None) -> list[type[Box]]:
         if coords is None:
             coords = self._default_box_coords
 
@@ -436,7 +416,7 @@ class Dataset(AbstractDataset):
         boxes = self._boxes(seq)
 
         # find nearest sensor frame
-        sensor_ts = self.timestamps(seq, coords)[frame]
+        sensor_ts: int = self.timestamps(seq, coords)[frame]
         boxes_timestamps = self.timestamps(seq, "boxes")
         ann_frame = misc.nearest_sorted(boxes_timestamps, sensor_ts)
 
@@ -445,14 +425,20 @@ class Dataset(AbstractDataset):
             boxes = [b for b in boxes if b.frame == ann_frame]
 
             ann2coords = self.alignment(seq, (ann_frame, frame), ("boxes", coords))
+            if coords in self.img_sensors:
+                sensor = self.cam_sensors[self.img_sensors.index(coords)]
+                ann2sensor = self.alignment(seq, (ann_frame, frame), ("boxes", sensor))
+            else:
+                ann2sensor = ann2coords
 
             out = []
             for b in boxes:
                 obj2coords = ann2coords @ b.transform
                 if coords in self.cam_sensors:
-                    heading = -obj2coords.rotation.as_euler("YZX")[0] - np.pi / 2
+                    obj2sensor = ann2sensor @ b.transform
+                    heading = -obj2sensor.rotation.as_euler("YZX")[0] - np.pi / 2  # type: ignore
                 else:
-                    heading = obj2coords.rotation.as_euler("ZYX")[0]
+                    heading = obj2coords.rotation.as_euler("ZYX")[0]  # type: ignore
                 out.append(
                     dataclasses.replace(
                         b,
@@ -463,7 +449,7 @@ class Dataset(AbstractDataset):
                 )
 
             return out
-        
+
         # Don't interpolate if only one frame is annotated (ex: ZOD frames)
         if len(boxes_timestamps) < 2:
             return []
@@ -482,15 +468,17 @@ class Dataset(AbstractDataset):
         w = (sensor_ts - t1) / max(t2 - t1, 1e-6)  # TODO
 
         ann2coords = RigidTransform.interpolate(
-            self.alignment(seq, (i1, frame), ("boxes", coords)),
-            self.alignment(seq, (i2, frame), ("boxes", coords)),
+            self.alignment(seq, (i1, frame), ("boxes", coords)),  # type: ignore
+            self.alignment(seq, (i2, frame), ("boxes", coords)),  # type: ignore
             w,
         )
 
         out = []
         for b1, b2 in tracks:
             obj2coords = ann2coords @ RigidTransform.interpolate(
-                b1.transform, b2.transform, w
+                b1.transform,  # type: ignore
+                b2.transform,  # type: ignore
+                w,  # type: ignore
             )
             out.append(
                 dataclasses.replace(
@@ -503,17 +491,17 @@ class Dataset(AbstractDataset):
 
         return out
 
-    def rectangles(self, seq: int, frame: int):
+    def rectangles(self, seq, frame):
         raise NotImplementedError
 
-    def semantic(self, seq: int, frame: int):
+    def semantic(self, seq, frame, sensor):
         raise NotImplementedError
 
-    def semantic2d(self, seq: int, frame: int):
+    def semantic2d(self, seq, frame, sensor):
         raise NotImplementedError
 
-    def instances(self, seq: int, frame: int):
+    def instances(self, seq, frame, sensor):
         raise NotImplementedError
 
-    def instances2d(self, seq: int, frame: int):
+    def instances2d(self, seq, frame, sensor):
         raise NotImplementedError

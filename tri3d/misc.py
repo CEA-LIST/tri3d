@@ -3,7 +3,7 @@ import inspect
 import logging
 import weakref
 from collections import OrderedDict
-from typing import Callable, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar, overload
 
 import numpy as np
 
@@ -107,6 +107,14 @@ def memoize_method(maxsize=1):
     return decorator
 
 
+@overload
+def lr_bisect(a: np.ndarray, x: int) -> tuple[int, int]: ...
+
+
+@overload
+def lr_bisect(a: np.ndarray, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]: ...
+
+
 def lr_bisect(a, x):
     """return the indices of the surrounding values of x in a.
 
@@ -121,7 +129,15 @@ def lr_bisect(a, x):
     return i1, i2
 
 
-def nearest_sorted(a, x):
+@overload
+def nearest_sorted(a: np.ndarray, x: int) -> int: ...
+
+
+@overload
+def nearest_sorted(a: np.ndarray, x: np.ndarray) -> np.ndarray: ...
+
+
+def nearest_sorted(a, x): # type: ignore
     i1, i2 = lr_bisect(a, x)
     a1 = a[i1]
     a2 = a[i2]

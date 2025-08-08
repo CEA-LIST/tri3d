@@ -2,10 +2,8 @@ import pathlib
 
 import numpy as np
 
+from ..geometry import RigidTransform, Translation
 from .dataset import Dataset
-from ..geometry import Translation, RigidTransform
-from ..misc import memoize_method
-
 
 label_names = {
     0: "unlabeled",
@@ -94,7 +92,7 @@ class SemanticKITTI(Dataset):
 
     _default_pcl_sensor = "velodyne"
 
-    def __init__(self, root, sequences: list[str]):
+    def __init__(self, root, sequences: list[str] = train_sequences):
         self.root = pathlib.Path(root)
         self._sequences = sequences
 
@@ -134,7 +132,7 @@ class SemanticKITTI(Dataset):
 
             self.__poses.append(poses)
 
-    def _calibration(self, seq: int, src_sensor: str, dst_sensor: str):
+    def _calibration(self, seq, src_sensor, dst_sensor):
         if src_sensor == dst_sensor:
             return Translation([0.0, 0.0, 0.0])
 
@@ -151,19 +149,21 @@ class SemanticKITTI(Dataset):
         path = self.root / self._sequences[seq] / "velodyne" / f"{frame:06d}.bin"
         return np.fromfile(path, dtype=np.float32).reshape(-1, 4)
 
+    def _boxes(self, seq):
+        raise NotImplementedError
+
     def sequences(self):
         return list(range(len(self._sequences)))
 
-    def timestamps(self, seq: int, sensor: str):
+    def timestamps(self, seq, sensor="velodyne"):
         return self._timestamps[seq]
 
-    @memoize_method()
     def _labels(self, seq, frame):
         path = self.root / self._sequences[seq] / "labels" / f"{frame:06d}.label"
         return np.fromfile(path, dtype=np.int16).reshape(-1, 2)
 
-    def semantic(self, seq: int, frame: int, sensor=None):
+    def semantic(self, seq, frame, sensor="velodyne"):
         return self.label_lut[self._labels(seq, frame)[:, 0]]
 
-    def instances(self, seq: int, frame: int, sensor=None):
+    def instances(self, seq, frame, sensor="velodyne"):
         return self._labels(seq, frame)[:, 1]

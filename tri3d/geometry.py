@@ -1,12 +1,11 @@
 import itertools
 from abc import ABC, abstractmethod
-from typing import Self
+from typing import Iterator, Literal, Self, overload
 
 import numpy as np
 
-from .camera import project_kannala, project_pinhole
 from . import quaternion
-
+from .camera import project_kannala, project_pinhole
 
 __all__ = [
     "Transformation",
@@ -50,21 +49,19 @@ class Transformation(ABC):
     @abstractmethod
     def single(self) -> bool:
         """Whether this is a single transformation or a batch."""
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def __len__(self) -> int:
-        raise NotImplementedError
+    def __len__(self) -> int: ...
 
     @abstractmethod
-    def __getitem__(self):
-        raise NotImplementedError
+    def __getitem__(self, item) -> Self: ...
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Self]:
         for i in range(len(self)):
             yield self[i]
 
-    def __matmul__(self, other: Self) -> Self:
+    def __matmul__(self, other: "Transformation") -> "Transformation":
         """Compose transformations together.
 
         The rightmost operation is applied first.
@@ -92,12 +89,12 @@ class Transformation(ABC):
         | ``[n]``     | ``[n]``   | ``[n,3]``  | one-to-one mapping  |
         +-------------+-----------+------------+---------------------+
         """
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def inv(self) -> Self:
         """Return inverse transformation."""
-        raise NotImplementedError
+        ...
 
 
 class Pipeline(Transformation):
@@ -114,7 +111,7 @@ class Pipeline(Transformation):
             raise ValueError("Batched operations must have the same length")
 
     @property
-    def single(self) -> bool:
+    def single(self):
         return all(p.single for p in self.operations)
 
     def __len__(self):
@@ -123,28 +120,26 @@ class Pipeline(Transformation):
 
         return max([len(op) for op in self.operations if not op.single])
 
-    def __getitem__(self, item) -> Self:
+    def __getitem__(self, item):
         if self.single:
             raise TypeError("cannot index single transform")
 
-        return Pipeline(
-            *[op if op.single else op[item] for op in self.operations]
-        )
+        return Pipeline(*[op if op.single else op[item] for op in self.operations])
 
-    def __matmul__(self, other: Transformation) -> Transformation:
+    def __matmul__(self, other) -> "Pipeline":
         if isinstance(other, Pipeline):
             return Pipeline(*other.operations, *self.operations)
         else:
             return Pipeline(other, *self.operations)
 
-    def apply(self, x: np.ndarray):
+    def apply(self, x):
         out = x
         for op in self.operations:
             out = op.apply(out)
 
         return out
 
-    def inv(self) -> Self:
+    def inv(self):
         return Pipeline(*[op.inv() for op in self.operations[::-1]])
 
 
@@ -156,10 +151,10 @@ class AffineTransform(Transformation):
 
     def __init__(self, mat: np.ndarray):
         self.mat = np.tile(np.eye(4), mat.shape[:-2] + (1, 1))
-        self.mat[..., :mat.shape[-2], :mat.shape[-1]] = mat
+        self.mat[..., : mat.shape[-2], : mat.shape[-1]] = mat
 
     @property
-    def single(self) -> bool:
+    def single(self):
         return self.mat.ndim == 2
 
     def __len__(self):
@@ -168,13 +163,13 @@ class AffineTransform(Transformation):
 
         return self.mat.shape[0]
 
-    def __getitem__(self, item) -> Self:
+    def __getitem__(self, item):
         if self.single:
             raise TypeError("cannot index single transform")
 
         return AffineTransform(self.mat[item])
 
-    def __matmul__(self, other: Transformation) -> Transformation:
+    def __matmul__(self, other):
         if isinstance(other, AffineTransform):
             mat = self.mat
             other_mat = other.mat
@@ -189,7 +184,7 @@ class AffineTransform(Transformation):
         else:
             return super().__matmul__(other)
 
-    def apply(self, x) -> np.ndarray:
+    def apply(self, x):
         x = np.asarray(x)
 
         return (
@@ -197,7 +192,7 @@ class AffineTransform(Transformation):
             + self.mat[..., :3, 3]
         )
 
-    def inv(self) -> Self:
+    def inv(self):
         return AffineTransform(np.linalg.inv(self.mat))
 
 
@@ -237,7 +232,7 @@ class Rotation(Transformation):
 
         return len(self.quat)
 
-    def __getitem__(self, item) -> Self:
+    def __getitem__(self, item):
         if self.single:
             raise TypeError("cannot index single transform")
 
@@ -250,11 +245,11 @@ class Rotation(Transformation):
         x = np.asarray(x)
         return np.linalg.vecdot(np.expand_dims(x, -2), self.mat)
 
-    def inv(self) -> Self:
+    def inv(self):
         return Rotation(self.quat * np.array([1, -1, -1, -1], dtype=self.quat.dtype))
 
     @property
-    def single(self) -> bool:
+    def single(self):
         return self.quat.ndim == 1
 
     def as_quat(self):
@@ -289,7 +284,7 @@ class Translation(Transformation):
         self.vec = np.asarray(vec)
 
     @property
-    def single(self) -> bool:
+    def single(self):
         return self.vec.ndim == 1
 
     def __repr__(self):
@@ -304,9 +299,9 @@ class Translation(Transformation):
 
         return len(self.vec)
 
-    def __getitem__(self, item) -> Self:
+    def __getitem__(self, item):
         if self.single:
-            raise TypeError("Single Translation has no len.")
+            raise TypeError("cannot index single Translation.")
 
         return Translation(self.vec[item])
 
@@ -333,7 +328,7 @@ class Translation(Transformation):
         x = np.asarray(x)
         return np.add(x, self.vec, dtype=x.dtype)
 
-    def inv(self) -> Self:
+    def inv(self):
         return Translation(-self.vec)
 
 
@@ -361,7 +356,7 @@ class RigidTransform(Transformation):
         self.translation = translation
 
     @classmethod
-    def interpolate(cls, p1: Self, p2: Self, w: float):
+    def interpolate(cls, p1: Self, p2: Self, w: float | np.ndarray):
         """Linearly interpolate between two transformations.
 
         :param p1:
@@ -371,13 +366,13 @@ class RigidTransform(Transformation):
         :param w:
             Interpolation ratio such that 0. -> p1, 1. -> p2.
         """
-        w = np.asarray(w)
+        w = np.asarray(w)  # type: ignore
         q = quaternion.slerp(p1.rotation.quat, p2.rotation.quat, w)
         t = (1 - w[..., None]) * p1.translation.vec + w[..., None] * p2.translation.vec
         return cls(q, t)
 
     @property
-    def single(self) -> bool:
+    def single(self):
         return self.rotation.single and self.translation.single
 
     def __repr__(self):
@@ -405,9 +400,9 @@ class RigidTransform(Transformation):
             1 if self.rotation.single else len(self.rotation),
         )
 
-    def __getitem__(self, item) -> Self:
+    def __getitem__(self, item):
         if self.single:
-            raise TypeError("Single RigidTranform has no len.")
+            raise TypeError("cannot index single RigidTranform.")
 
         return RigidTransform(
             self.rotation if self.rotation.single else self.rotation[item],
@@ -417,7 +412,13 @@ class RigidTransform(Transformation):
     def __iter__(self):
         return itertools.starmap(RigidTransform, zip(self.rotation, self.translation))
 
-    def __matmul__(self, other: Transformation) -> Transformation:
+    @overload
+    def __matmul__(self, other: Self) -> Self: ...
+
+    @overload
+    def __matmul__(self, other: Transformation) -> Transformation: ...
+
+    def __matmul__(self, other):
         if isinstance(other, Translation):
             return RigidTransform(
                 self.rotation, self.translation.vec + self.rotation.apply(other.vec)
@@ -436,7 +437,7 @@ class RigidTransform(Transformation):
         x = np.asarray(x)
         return self.rotation.apply(x) + self.translation.vec
 
-    def inv(self) -> Self:
+    def inv(self):
         inv = self.rotation.inv()
         return RigidTransform(inv, -inv.apply(self.translation.vec))
 
@@ -447,33 +448,44 @@ class RigidTransform(Transformation):
 
 
 class CameraProjection(Transformation):
-    def __init__(self, model, intrinsics):
-        self.model = model
-        self.intrinsics = intrinsics
+    def __init__(
+        self, model: Literal["pinhole", "kannala"], intrinsics, w=None, h=None
+    ):
+        self.w = w
+        self.h = h
+        self.model: Literal["pinhole", "kannala"] = model
+        self.intrinsics = np.asarray(intrinsics)
 
     @property
-    def single(self) -> bool:
-        return True
+    def single(self):
+        return self.intrinsics.ndim == 1
 
-    def __len__(self) -> int:
-        raise ValueError("single transform has no len")
+    def __len__(self):
+        if self.single:
+            raise TypeError("Single CameraProjection has no len.")
 
-    def __getitem__(self) -> int:
-        raise ValueError("single transform has no items")
+        return self.intrinsics.shape[0]
 
-    def apply(self, xyz):
-        if self.model == "pinhole":
-            return project_pinhole(xyz, *self.intrinsics)
-        elif self.model == "kannala":
-            return project_kannala(xyz, *self.intrinsics)
+    def __getitem__(self, item):
+        if self.single:
+            raise TypeError("cannot index single CameraProjection.")
+
+        return CameraProjection(self.model, self.intrinsics[item], self.w, self.h)
+
+    def apply(self, x):
+        if self.single:
+            if self.model == "pinhole":
+                return project_pinhole(x, *self.intrinsics)
+            else:
+                return project_kannala(x, *self.intrinsics)
+
         else:
-            raise ValueError("")
+            if x.ndim == 1:
+                x = np.broadcast_to(x, (len(self), 3))
 
-    def as_matrix(self) -> np.ndarray:
-        # TODO: implement at least for rectified camera
-        raise NotImplementedError
+            return np.stack([cp.apply(row) for cp, row in zip(self, x)], axis=0)
 
-    def inv(self) -> Self:
+    def inv(self):
         # TODO: implement at least for rectified camera
         raise NotImplementedError
 

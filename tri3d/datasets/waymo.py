@@ -254,12 +254,22 @@ class Waymo(Dataset):
                 ],
             )
             calib = camera_calibration.to_pylist()[0]
-            fx, fy, cx, cy, k1, p1, p2 = [
-                calib["[CameraCalibrationComponent].intrinsic." + field]
-                for field in ["f_u", "f_v", "c_u", "c_v", "k1", "p1", "p2"]
+            w, h, fx, fy, cx, cy, k1, p1, p2 = [
+                calib["[CameraCalibrationComponent]." + field]
+                for field in [
+                    "width",
+                    "height",
+                    "intrinsic.f_u",
+                    "intrinsic.f_v",
+                    "intrinsic.c_u",
+                    "intrinsic.c_v",
+                    "intrinsic.k1",
+                    "intrinsic.p1",
+                    "intrinsic.p2",
+                ]
             ]
             cam2img = geometry.CameraProjection(
-                "pinhole", (fx, fy, cx, cy, k1, 0.0, p1, p2)
+                "pinhole", (fx, fy, cx, cy, k1, 0.0, p1, p2), w, h
             )
 
             cam_sensor = self.cam_sensors[self.img_sensors.index(dst_sensor)]
@@ -299,8 +309,7 @@ class Waymo(Dataset):
         else:
             raise ValueError("invalid or unsupported coords combination")
 
-    # @misc.memoize_method(maxsize=1000)
-    def _poses(self, seq, sensor):
+    def _poses(self, seq, sensor) -> geometry.RigidTransform:
         if sensor == "boxes":
             sensor = "LIDAR_TOP"
 
@@ -334,9 +343,10 @@ class Waymo(Dataset):
                 .to_numpy()
                 .reshape(-1, 4, 4)
             )
-            return geometry.RigidTransform.from_matrix(poses) @ self._calibration(
+            sensor2lidar: geometry.RigidTransform = self._calibration(
                 seq, sensor, "LIDAR_TOP"
-            )
+            )  # type: ignore
+            return geometry.RigidTransform.from_matrix(poses) @ sensor2lidar
 
         raise ValueError()
 
@@ -557,7 +567,7 @@ class Waymo(Dataset):
     def sequences(self):
         return list(range(len(self.records)))
 
-    def timestamps(self, seq: Optional[int] = None, sensor="LIDAR_TOP"):
+    def timestamps(self, seq, sensor):
         if sensor == "boxes":
             sensor = "LIDAR_TOP"
         if sensor in self.img_sensors:
@@ -565,7 +575,7 @@ class Waymo(Dataset):
 
         return self.timelines[seq][sensor]
 
-    def image(self, seq, frame, sensor="CAM_FRONT"):
+    def image(self, seq, frame, sensor):
         """Return image from given camera at given frame.
 
         A default sensor (for instance a front facing camera) should be
@@ -587,7 +597,7 @@ class Waymo(Dataset):
 
         return Image.open(io.BytesIO(data))
 
-    def _panoptic(self, seq: int, frame: int, sensor="LIDAR_TOP"):
+    def _panoptic(self, seq, frame, sensor):
         record = self.records[seq]
         timestamp = self.timelines[seq][sensor][frame] - 0.05
         laser_name = self.pcl_sensors.index(sensor) + 1
@@ -616,15 +626,15 @@ class Waymo(Dataset):
 
         return segmentation1[return1[:, :, 0] > 0], segmentation2[return2[:, :, 0] > 0]
 
-    def semantic(self, seq: int, frame: int, sensor="LIDAR_TOP"):
+    def semantic(self, seq, frame, sensor):
         return1, return2 = self._panoptic(seq, frame, sensor)
         return np.concatenate([return1[:, 1], return2[:, 1]])
 
-    def instances(self, seq: int, frame: int, sensor="LIDAR_TOP"):
+    def instances(self, seq, frame, sensor):
         return1, return2 = self._panoptic(seq, frame, sensor)
         return np.concatenate([return1[:, 0], return2[:, 0]])
 
-    def _panoptic2d(self, seq: int, frame: int, sensor="IMG_FRONT"):
+    def _panoptic2d(self, seq, frame, sensor):
         record = self.records[seq]
         timestamp = self.timelines[seq]["LIDAR_TOP"][frame] - 0.05  # frame timestamp
         camera_name = self.img_sensors.index(sensor.replace("CAM_", "IMG_")) + 1
@@ -656,20 +666,20 @@ class Waymo(Dataset):
 
         return segmentation, instances
 
-    def semantic2d(self, seq: int, frame: int, sensor="IMG_FRONT"):
+    def semantic2d(self, seq, frame, sensor):
         segmentation, _ = self._panoptic2d(seq, frame, sensor)
         return segmentation
 
-    def instances2d(self, seq: int, frame: int, sensor="IMG_FRONT"):
+    def instances2d(self, seq, frame, sensor):
         _, instances = self._panoptic2d(seq, frame, sensor)
         return instances
 
-    def frames(self, seq=None, sensor=None):
+    def frames(self, seq, sensor):
         if sensor.startswith("SEG_"):
             seg_ts = self.timestamps(seq, sensor)
             sensor_ts = self.timestamps(seq, sensor.removeprefix("SEG_"))
             frames = np.searchsorted(sensor_ts, seg_ts, side="left")
-            return [(seq, f) for f in frames.tolist()]
+            return frames
 
         else:
             return super(Waymo, self).frames(seq, sensor)

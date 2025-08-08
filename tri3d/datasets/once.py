@@ -121,7 +121,7 @@ class Once(Dataset):
                 [
                     Box(
                         frame=frame,
-                        uid=None,
+                        uid=len(self._scene_annotations),
                         center=center,
                         size=size,
                         heading=heading,
@@ -139,7 +139,7 @@ class Once(Dataset):
                 ]
             )
 
-    def _calibration(self, seq: int, src_sensor: str, dst_sensor: str):
+    def _calibration(self, seq, src_sensor, dst_sensor):
         if src_sensor == "ego" or src_sensor == "boxes":
             src_sensor = "lidar_roof"
 
@@ -168,7 +168,7 @@ class Once(Dataset):
 
         raise ValueError("Use imu pose to infer sensor poses.")
 
-    def _points(self, seq: int, frame: int, sensor: str) -> np.ndarray:
+    def _points(self, seq, frame, sensor):
         pcl = np.fromfile(
             self.root
             / self.scenes[seq]
@@ -185,13 +185,13 @@ class Once(Dataset):
     def sequences(self):
         return list(range(len(self.scenes)))
 
-    def timestamps(self, seq: int, sensor: str):
+    def timestamps(self, seq, sensor):
         return self._scene_timestamps[seq]
 
-    def image(self, seq: int, frame: int, sensor: str):
+    def image(self, seq, frame, sensor):
         return PIL.Image.open(
             self.root
             / self.scenes[seq]
-            / self.cam_sensors[self.img_sensors.index(sensor)]
+            / sensor
             / (self._scene_frameids[seq][frame] + ".jpg")
         )

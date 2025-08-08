@@ -35,7 +35,7 @@ class ZODFrames(Dataset):
         "Vehicle",
         "VulnerableVehicle",
     ]
-    sem_labels = None
+    sem_labels = []
     _default_cam_sensor = "front"
     _default_pcl_sensor = "velodyne"
     _default_box_coords = "velodyne"
@@ -212,7 +212,9 @@ class ZODFrames(Dataset):
     def timestamps(self, seq, sensor):
         return self._timelines[seq][sensor]
 
-    def image(self, seq: int, frame: int = 0, sensor: str = "img_front"):
+    def image(self, seq, frame, sensor):
+        if sensor is None:
+            sensor = "img_front"
         sensor = sensor.removeprefix("img_") + "_" + self.anon_method
         filepath = self.metadata[seq]["camera_frames"][sensor][frame]["filepath"]
         return Image.open(self.root / filepath)

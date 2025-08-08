@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import os
+import pathlib
 import uuid
 
 import numpy as np
@@ -10,6 +11,7 @@ from ..geometry import (
     CameraProjection,
     RigidTransform,
     Rotation,
+    Transformation,
     Translation,
 )
 from ..misc import memoize_method
@@ -19,15 +21,15 @@ from .dataset import Box, Dataset
 @dataclasses.dataclass(frozen=True)
 class NuScenesBox(Box):
     attributes: list[str]
-    visibility: str
+    visibility: str | None
     num_lidar_pts: int
     num_radar_pts: int
 
 
 @dataclasses.dataclass()
 class Scene:
-    data: dict[str, list]
-    calibration: dict[str]
+    data: dict[str, list[str]]
+    calibration: dict[str, np.ndarray]
     ego_poses: dict[str, RigidTransform]
     keyframes: dict[str, np.ndarray]
     sample_tokens: list[str]
@@ -63,41 +65,42 @@ class NuScenes(Dataset):
         det_label_map=None,
         sem_label_map=None,
     ):
+        root = pathlib.Path(root)
         self.root = root
         self.subset = subset
         self.det_label_map = det_label_map
         self.sem_label_map = sem_label_map
 
         # load original data
-        with open(os.path.join(root, subset, "attribute.json"), "rb") as f:
+        with open(root / subset / "attribute.json", "rb") as f:
             attribute = json.load(f)
-        with open(os.path.join(root, subset, "calibrated_sensor.json"), "rb") as f:
+        with open(root / subset / "calibrated_sensor.json", "rb") as f:
             calibrated_sensor = json.load(f)
-        with open(os.path.join(root, subset, "category.json"), "rb") as f:
+        with open(root / subset / "category.json", "rb") as f:
             category = json.load(f)
-        with open(os.path.join(root, subset, "ego_pose.json"), "rb") as f:
+        with open(root / subset / "ego_pose.json", "rb") as f:
             ego_pose = json.load(f)
-        with open(os.path.join(root, subset, "instance.json"), "rb") as f:
+        with open(root / subset / "instance.json", "rb") as f:
             instance = json.load(f)
-        with open(os.path.join(root, subset, "sample.json"), "rb") as f:
+        with open(root / subset / "sample.json", "rb") as f:
             sample = json.load(f)
-        with open(os.path.join(root, subset, "sample_annotation.json"), "rb") as f:
+        with open(root / subset / "sample_annotation.json", "rb") as f:
             sample_annotation = json.load(f)
-        with open(os.path.join(root, subset, "sample_data.json"), "rb") as f:
+        with open(root / subset / "sample_data.json", "rb") as f:
             sample_data = json.load(f)
-        with open(os.path.join(root, subset, "scene.json"), "rb") as f:
+        with open(root / subset / "scene.json", "rb") as f:
             scene = json.load(f)
-        with open(os.path.join(root, subset, "sensor.json"), "rb") as f:
+        with open(root / subset / "sensor.json", "rb") as f:
             sensor = json.load(f)
-        with open(os.path.join(root, subset, "visibility.json"), "rb") as f:
+        with open(root / subset / "visibility.json", "rb") as f:
             visibility = json.load(f)
-        if os.path.exists(os.path.join(root, subset, "lidarseg.json")):
-            with open(os.path.join(root, subset, "lidarseg.json"), "rb") as f:
+        if os.path.exists(root / subset / "lidarseg.json"):
+            with open(root / subset / "lidarseg.json", "rb") as f:
                 lidarseg = json.load(f)
         else:
             lidarseg = []
-        if os.path.exists(os.path.join(root, subset, "panoptic.json")):
-            with open(os.path.join(root, subset, "panoptic.json"), "rb") as f:
+        if os.path.exists(root / subset / "panoptic.json"):
+            with open(root / subset / "panoptic.json", "rb") as f:
                 panoptic = json.load(f)
         else:
             panoptic = []
@@ -215,7 +218,7 @@ class NuScenes(Dataset):
                     frame=sample_idx[sample_t],
                     uid=instance_t,
                     center=center,
-                    size=(length, width, height),
+                    size=np.array([length, width, height]),
                     heading=transform.rotation.as_euler("ZYX")[0],
                     transform=transform,
                     label=label,
@@ -250,7 +253,7 @@ class NuScenes(Dataset):
                     calib["rotation"] = (
                         Rotation(calib["rotation"])
                         @ Rotation.from_euler("Z", np.pi / 2)
-                    ).as_quat()
+                    ).as_quat()  # type: ignore
 
                 scene_calibration[channel] = calib
 
@@ -296,7 +299,7 @@ class NuScenes(Dataset):
         self.annotations_cache = {}
 
     @memoize_method(maxsize=100)
-    def _calibration(self, seq, src_sensor, dst_sensor):
+    def _calibration(self, seq, src_sensor, dst_sensor) -> Transformation:
         if src_sensor == dst_sensor:
             return Translation([0.0, 0.0, 0.0])
 
@@ -342,12 +345,12 @@ class NuScenes(Dataset):
         if sensor in self.img_sensors:
             sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
-        return self.scenes[seq].ego_poses[sensor] @ self._calibration(
-            seq, sensor, "ego"
-        )
+        sensor2ego: RigidTransform = self._calibration(seq, sensor, "ego")  # type: ignore
+        ego2world = self.scenes[seq].ego_poses[sensor]
+        return ego2world @ sensor2ego
 
     def _points(self, seq, frame, sensor):
-        filename = os.path.join(self.root, self.scenes[seq].data[sensor][frame])
+        filename = self.root / self.scenes[seq].data[sensor][frame]
         pcl = np.fromfile(filename, dtype=np.float32).reshape(-1, 5)
 
         # Rotate pcl to make x point forward
@@ -372,7 +375,7 @@ class NuScenes(Dataset):
         if sensor in self.img_sensors:
             sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
-        filename = os.path.join(self.root, self.scenes[seq].data[sensor][frame])
+        filename = self.root / self.scenes[seq].data[sensor][frame]
         return PIL.Image.open(filename)
 
     def rectangles(self, seq: int, frame: int):
@@ -383,7 +386,7 @@ class NuScenes(Dataset):
         if filename is None:
             raise ValueError(f"frame {frame} has no segmentation")
 
-        semantic = np.fromfile(os.path.join(self.root, filename), dtype=np.uint8)
+        semantic = np.fromfile(self.root / filename, dtype=np.uint8)
 
         if self.sem_label_map is not None:
             semantic = self.sem_label_map[semantic]
@@ -395,7 +398,7 @@ class NuScenes(Dataset):
         if filename is None:
             raise ValueError(f"frame {frame} has no panoptic")
 
-        panoptic = np.load(os.path.join(self.root, filename))["data"] % 1000
+        panoptic = np.load(self.root / filename)["data"] % 1000
 
         return panoptic
 
@@ -422,7 +425,7 @@ def dump_nuscene_boxes(
 
     Args:
         dataset: the nuscene dataset
-        poses: *for each box* the index of its sequence
+        seq_indices: *for each box* the index of its sequence
         sensor: the coordinate system in which box poses are expressed
         boxes: the boxes to export
         keyframes:
@@ -448,14 +451,13 @@ def dump_nuscene_boxes(
             sample_token = dataset.sample_tokens(s)[b.frame]
         else:
             frame = b.frame
-            try:
-                keyframe_idx = dataset.keyframes(s, sensor).index(b.frame)
-            except KeyError:
+            keyframe_idx = np.searchsorted(dataset.keyframes(s, sensor), b.frame)
+            if dataset.keyframes(s, sensor)[keyframe_idx] != b.frame:
                 continue
             sample_token = dataset.sample_tokens(s)[keyframe_idx]
 
         ego_pose = dataset.poses(s, sensor)[frame]
-        box_pose = ego_pose @ b.transform
+        box_pose: RigidTransform = ego_pose @ b.transform  # type: ignore
         length, width, height = b.size
 
         out.append(

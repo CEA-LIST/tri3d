@@ -5,15 +5,15 @@ import pytest
 
 from tri3d.datasets import (
     AbstractDataset,
-    KITTIObject,
     NuScenes,
     Once,
+    SemanticKITTI,
     Waymo,
     ZODFrames,
 )
 
 
-@pytest.fixture(scope="module", params=[KITTIObject, NuScenes, Once, Waymo, ZODFrames])
+@pytest.fixture(scope="module", params=[NuScenes, Once, SemanticKITTI, Waymo, ZODFrames])
 def dataset(request) -> AbstractDataset:
     cls = request.param
     return cls(pathlib.Path(__file__).parent.parent / "datasets" / cls.__name__.lower())
@@ -27,18 +27,19 @@ def test_frames(dataset):
 
 def test_data(dataset):
     sequences = dataset.sequences()
+    seq = sequences[-1]
 
     # Sensors have frames and frames have data
     for s in dataset.pcl_sensors:
-        frames = dataset.frames(sequences[-1], sensor=s)
+        frames = dataset.frames(seq, sensor=s)
         if len(frames) > 0:
-            pcl = dataset.points(*frames[0], sensor=s)
+            pcl = dataset.points(seq, frames[0], sensor=s)
             assert pcl.shape[0] > 0 and pcl.shape[1] >= 3
 
     for s in dataset.img_sensors:
-        frames = dataset.frames(sequences[-1], sensor=s)
+        frames = dataset.frames(seq, sensor=s)
         if len(frames) > 0:
-            img = dataset.image(*frames[-1], sensor=s)
+            img = dataset.image(seq, frames[-1], sensor=s)
             assert img.size > (0, 0)
 
 
@@ -63,6 +64,9 @@ def test_poses(dataset):
             poses = dataset.poses(sequences[0], sensor=s)
             assert len(frames) == len(poses)
 
+    if len(dataset.cam_sensors) == 0:
+        return
+
     frames = dataset.frames(sequences[0], sensor=dataset.pcl_sensors[0])
     poses = dataset.poses(
         sequences[0], sensor=dataset.cam_sensors[0], timeline=dataset.pcl_sensors[0]
@@ -72,6 +76,10 @@ def test_poses(dataset):
 
 
 def test_alignment(dataset):
+    if len(dataset.cam_sensors) == 0:
+        pytest.skip("no camera sensors")
+        return
+
     sequences = dataset.sequences()
     seq = sequences[0]
     s1 = dataset.pcl_sensors[0]
