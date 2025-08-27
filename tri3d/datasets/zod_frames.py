@@ -18,6 +18,20 @@ class ZODFrames(Dataset):
        * Lidars are rotated by 90° around Z so that x points forward of the ego car.
        * Boxes are interpolated to all frames, use the timestamps to decide if they
          are relevant.
+
+    .. run::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from tri3d.datasets import ZODFrames
+        from tri3d.misc import nearest_sorted
+
+        plt.switch_backend("Agg")
+
+        dataset = ZODFrames("datasets/zodframes")
+        name = "tri3d.datasets.ZODFrames"
+        camera, imgcoords, lidar = "front", "img_front", "velodyne"
+        seq, frame, cam_frame = 0, 10, 0
     """
 
     cam_sensors = ["front"]
@@ -206,7 +220,6 @@ class ZODFrames(Dataset):
         return out
 
     def sequences(self):
-        """Return the list of sequences/recordings indices (0..num_sequences)."""
         return list(range(len(self.metadata)))
 
     def timestamps(self, seq, sensor):

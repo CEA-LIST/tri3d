@@ -49,6 +49,21 @@ test_sequences = ["11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "2
 
 
 class SemanticKITTI(Dataset):
+    """`SemanticKITTI <https://semantic-kitti.org>`_ dataset.
+    
+    .. run::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from tri3d.datasets import SemanticKITTI
+
+        plt.switch_backend("Agg")
+
+        dataset = SemanticKITTI("datasets/semantickitti")
+        name = "tri3d.datasets.SemanticKITTI"
+        camera, imgcoords, lidar = None, None, "velodyne"
+        seq, frame, cam_frame = 1, 0, None
+    """
     cam_sensors = []
     img_sensors = []
     pcl_sensors = ["velodyne"]

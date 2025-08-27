@@ -12,11 +12,12 @@ Tri3D facilitates the utilization of 3D driving datasets by providing:
 -   Plotting utilities.
 
 As of now, Tri3D supports the following datasets:
-[NuScenes](https://www.nuscenes.org/nuscenes),
-[ONCE Dataset](https://once-for-auto-driving.github.io)
-[Semantic KITTI](https://semantic-kitti.org)
-[Waymo open dataset](https://waymo.com/open),
-[Zenseact Open Dataset](https://zod.zenseact.com/frames).
+
+- [NuScenes](https://www.nuscenes.org/nuscenes)
+- [ONCE Dataset](https://once-for-auto-driving.github.io)
+- [Semantic KITTI](https://semantic-kitti.org)
+- [Waymo open dataset](https://waymo.com/open)
+- [Zenseact Open Dataset](https://zod.zenseact.com/frames)
 
 ## Conventions
 

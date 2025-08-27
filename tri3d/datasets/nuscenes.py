@@ -51,6 +51,19 @@ class NuScenes(Dataset):
     The :meth:`keyframes` method returns the indices of the keyframes for each
     sensor. Keyframes aggregate a sample for each sensor around a timestamps
     at around 2Hz.
+
+    .. run::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from tri3d.datasets import NuScenes
+
+        plt.switch_backend("Agg")
+
+        dataset = NuScenes("datasets/nuscenes", "v1.0-mini")
+        name = "tri3d.datasets.NuScenes"
+        camera, imgcoords, lidar = "CAM_FRONT", "IMG_FRONT", "LIDAR_TOP"
+        seq, frame, cam_frame = 5, 130, 77
     """
 
     scenes: list[Scene]

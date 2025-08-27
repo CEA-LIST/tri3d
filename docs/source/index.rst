@@ -20,6 +20,14 @@ Introduction
    geometry
    plot
 
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: External links
+
+   Github repository <https://github.com/CEA-LIST/tri3d>
+   PyPi package <https://pypi.org/project/tri3d>
+
 .. image:: waymo.jpg
   :alt: Waymo sample
 
@@ -32,11 +40,12 @@ Tri3D facilitates the utilization of 3D driving datasets by providing:
 - Plotting utilities.
 
 As of now, Tri3D supports the following datasets: 
-:class:`NuScenes <tri3d.datasets.NuScenes>`,
-:class:`ONCE Dataset <https://once-for-auto-driving.github.io>`,
-:class:`Semantic KITTI <https://semantic-kitti.org>`,
-:class:`Waymo open dataset <tri3d.datasets.Waymo>`,
-:class:`Zenseact Open Dataset <tri3d.datasets.ZODFrames>`.
+
+- `NuScenes <https://www.nuscenes.org/nuscenes>`_
+- `ONCE Dataset <https://once-for-auto-driving.github.io>`_
+- `Semantic KITTI <https://semantic-kitti.org>`_
+- `Waymo open dataset <https://waymo.com/open>`_
+- `Zenseact Open Dataset <https://zod.zenseact.com/frames>`_
 
 
 Conventions

@@ -38,16 +38,7 @@ dev = [
   "ruff",
   "scipy",
   "sphinx",
-requires-python = ">=3.10"
-keywords = []
-license = { text = "CECILL-C" }
-classifiers = []
-dependencies = ["numpy", "Pillow", "shapely", "pyarrow", "pypcd4", "numba"]
-dynamic = ["version"]
-
-[project.optional-dependencies]
-plot = ["matplotlib", "k3d"]
-align_nuscenes = ["torch", "torch-cluster", "tqdm"]
+  "sphinxrun @ git+https://github.com/nlgranger/sphinxrun.git",
 ]
 
 [tool.setuptools]

@@ -11,6 +11,7 @@ Datasets
    :template: base.rst
 
    Box
+   AbstractDataset
    NuScenes
    Once
    SemanticKITTI

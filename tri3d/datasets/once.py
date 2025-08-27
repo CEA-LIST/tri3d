@@ -19,6 +19,19 @@ class Once(Dataset):
     .. note::
        The lidar is rotated 90° clockwise so that x points toward the front of
        the ego car.
+
+    .. run::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from tri3d.datasets import Once
+
+        plt.switch_backend("Agg")
+
+        dataset = Once("datasets/once", "train")
+        name = "tri3d.datasets.Once"
+        camera, imgcoords, lidar = "cam01", "img01", "lidar_roof"
+        seq, frame, cam_frame = 1, 0, 0
     """
 
     cam_sensors = [

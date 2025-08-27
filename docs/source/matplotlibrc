@@ -1,0 +1,21 @@
+axes.grid:          True
+axes.axisbelow:     False
+axes.spines.left:   False
+axes.spines.bottom: False
+axes.spines.top:    False
+axes.spines.right:  False
+
+grid.color:         "#a0a0a0"
+grid.linestyle:     ":"
+#grid.linewidth:     0.8
+grid.alpha:         0.6
+
+xtick.labelsize:    small
+xtick.bottom:       False
+ytick.left:         False
+ytick.labelsize:    small
+
+legend.fontsize:    small
+
+savefig.dpi:        300
+savefig.bbox:       tight

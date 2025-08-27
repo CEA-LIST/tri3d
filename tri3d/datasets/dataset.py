@@ -41,6 +41,22 @@ class AbstractDataset(ABC):
     Each implementation should document availables sensors and the label
     by which they are refered to. They are used to query data and to specify
     the timeline and spatial coordinate systems.
+
+    To implement a new dataset, you might want to derive instead from
+    :code:`tri3d.datasets.Dataset` as it already provides boilerplate code for most methods.
+
+    .. run::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from tri3d.datasets import Waymo
+
+        plt.switch_backend("Agg")
+
+        dataset = Waymo("datasets/waymo")
+        name = "tri3d.datasets.Waymo"
+        camera, imgcoords, lidar = "CAM_FRONT", "IMG_FRONT", "LIDAR_TOP"
+        seq, frame, cam_frame = 0, 24, 24
     """
 
     cam_sensors: list[str]
@@ -92,6 +108,28 @@ class AbstractDataset(ABC):
             An array of timestamps.
 
         .. note:: frames are guaranteed to be sorted.
+
+        .. run::
+
+            plt.figure(figsize=(8, 4))
+
+            t0, _, t1 = dataset.timestamps(seq, lidar)[:3]
+
+            sensors = dataset.pcl_sensors + dataset.cam_sensors
+            for i, s in enumerate(sensors):
+                t = (dataset.timestamps(seq, s) - t0)
+                plt.scatter(t, np.full(len(t), i), marker="|", s=100., label=s)
+
+            plt.yticks(np.arange(len(sensors)), labels=sensors)
+
+            plt.xlim(-0.1 * (t1 - t0), t1 - t0 + 0.1 * (t1 - t0))
+            plt.xlabel("time")
+
+            plt.savefig(f"docs/source/_static/{name}.timestamps.jpg")
+
+            sphinxrun.show(
+                f".. figure:: /_static/{name}.timestamps.jpg"
+            )
         """
         ...
 
@@ -113,6 +151,43 @@ class AbstractDataset(ABC):
             timestamps of that timeline if necessary.
         :return:
             Sensor poses as a batched transform.
+
+        .. run::
+
+            plt.figure(figsize=(8, 2.5))
+
+            p0 = dataset.poses(seq, lidar)[0]
+            sensors = dataset.pcl_sensors + dataset.cam_sensors
+            for i, s in enumerate(sensors):
+                if len(dataset.timestamps(0, s)) == 0:
+                    continue
+
+                for j, u in enumerate(np.eye(3) * 0.2):
+                    p = p0.inv() @ dataset.poses(seq, s)[:4]
+                    b = p.apply(u)
+                    a = p.apply([0.0, 0.0, 0.0])
+                    plt.quiver(
+                        a[:, 0],
+                        a[:, 1],
+                        (b - a)[:, 0],
+                        (b - a)[:, 1],
+                        width=0.004,
+                        angles="xy",
+                        scale_units="xy",
+                        scale=1,
+                        color=plt.get_cmap("tab10")(i),
+                        label=s if j == 0 else None,
+                    )
+                    plt.scatter(b[:, 0], b[:, 1], alpha=0.)
+
+            plt.gcf().legend(loc="outside upper center", ncol=5, fontsize="x-small")
+            plt.gca().set_aspect("equal")
+
+            plt.savefig(f"docs/source/_static/{name}.poses.jpg")
+
+            sphinxrun.show(
+                f".. figure:: /_static/{name}.poses.jpg"
+            )
         """
         ...
 
@@ -154,6 +229,22 @@ class AbstractDataset(ABC):
             Frame index.
         :param sensor:
             The image sensor to use.
+
+        .. run::
+
+            from tri3d.misc import nearest_sorted
+
+            try:
+                image = dataset.image(seq, cam_frame, camera)
+                plt.figure(figsize=(8, 6))
+                plt.imshow(image)
+                plt.savefig(f"docs/source/_static/{name}.image.jpg")
+
+                sphinxrun.show(
+                    f".. figure:: /_static/{name}.image.jpg"
+                )
+            except NotImplementedError:
+                pass
         """
         ...
 
@@ -182,6 +273,22 @@ class AbstractDataset(ABC):
         :return:
             A NxD array where the first 3 columns are X, Y, Z point coordinates
             and the remaining ones are dataset-specific.
+
+        .. run::
+
+            xyz = dataset.points(seq, frame, lidar)[:, :3]
+            xyz = xyz[np.argsort(xyz[:, 2])]
+
+            plt.figure(figsize=(8, 5))
+            plt.scatter(xyz[:, 0], xyz[:, 1], s=1., c=xyz[:, 2], clim=(-1, 2.))
+            plt.xlim(-25, 25)
+            plt.ylim(-10, 15)
+            plt.gca().set_aspect("equal")
+            plt.savefig(f"docs/source/_static/{name}.points.jpg")
+
+            sphinxrun.show(
+                f".. figure:: /_static/{name}.points.jpg"
+            )
         """
         ...
 
@@ -200,11 +307,32 @@ class AbstractDataset(ABC):
             The coordinate system and timeline to use.
         :return:
             A list of box annotations.
+
+        .. run::
+
+            from tri3d.plot import plot_bbox_cam
+
+            try:
+                image = dataset.image(seq, cam_frame, camera)
+                boxes = dataset.boxes(seq, cam_frame, coords=imgcoords)
+
+                plt.figure(figsize=(8, 5))
+                plt.imshow(image)
+                for b in boxes:
+                    plot_bbox_cam(b.transform, b.size, image.size)
+
+                plt.savefig(f"docs/source/_static/{name}.boxes.jpg")
+
+                sphinxrun.show(
+                    f".. figure:: /_static/{name}.boxes.jpg"
+                )
+            except NotImplementedError:
+                pass
         """
         ...
 
     @abstractmethod
-    def rectangles(self, seq: int, frame: int):
+    def rectangles(self, seq: int, frame: int, sensor: str):
         """Return a list of 2D rectangle annotations.
 
         .. note:: The default coordinate system should be documented.
@@ -230,6 +358,33 @@ class AbstractDataset(ABC):
             The camera sensor for which annotations are returned.
         :return:
             array of pointwise class label
+
+        .. run::
+
+            from tri3d.plot import gen_discrete_cmap
+
+            cmap = gen_discrete_cmap(len(dataset.sem_labels))
+
+            try:
+                xyz = dataset.points(seq, frame, lidar)[:, :3]
+                semantic = dataset.semantic(seq, frame, lidar)
+                order = np.argsort(xyz[:, 2])
+                xyz = xyz[order]
+                semantic = semantic[order]
+
+                plt.figure(figsize=(8, 6))
+                plt.scatter(xyz[:, 0], xyz[:, 1], s=1., c=semantic, cmap=cmap)
+                plt.xlim(-25, 25)
+                plt.ylim(-10, 15)
+                plt.gca().set_aspect("equal")
+
+                plt.savefig(f"docs/source/_static/{name}.semantic.jpg")
+
+                sphinxrun.show(
+                    f".. figure:: /_static/{name}.semantic.jpg"
+                )
+            except NotImplementedError:
+                pass
         """
         ...
 
@@ -253,6 +408,31 @@ class AbstractDataset(ABC):
             Frame index.
         :return:
             array of pointwise instance label
+
+        .. run::
+
+            try:
+                xyz = dataset.points(seq, frame, lidar)[:, :3]
+                instances = dataset.instances(seq, frame, lidar)
+                _, instances = np.unique(instances, return_inverse=True)
+                cmap = gen_discrete_cmap(instances.max() + 1)
+                order = np.argsort(xyz[:, 2])
+                xyz = xyz[order]
+                instances = instances[order]
+
+                plt.figure(figsize=(8, 6))
+                plt.scatter(xyz[:, 0], xyz[:, 1], s=1., c=instances, cmap=cmap)
+                plt.xlim(-25, 25)
+                plt.ylim(-10, 15)
+                plt.gca().set_aspect("equal")
+
+                plt.savefig(f"docs/source/_static/{name}.instances.jpg")
+
+                sphinxrun.show(
+                    f".. figure:: /_static/{name}.instances.jpg"
+                )
+            except NotImplementedError:
+                pass
         """
         ...
 

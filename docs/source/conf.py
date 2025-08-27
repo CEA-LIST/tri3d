@@ -3,6 +3,14 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import importlib.metadata
+import inspect
+import os
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+os.environ["MATPLOTLIBRC"] = os.path.join(project_root, "docs", "source")
+os.chdir(project_root)
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -10,14 +18,26 @@ project = "tri3d"
 copyright = "2024, Nicolas Granger"
 author = "Nicolas Granger"
 
+pkg_version = importlib.metadata.version("tri3d")
+if len(pkg_version.split("-")) > 1:
+    tag, revision, commit = pkg_version.split("-")
+    revision = revision[1:]  # remove 'r' prefix
+    release = "v{}-{}-{}".format(tag, revision, commit)
+    version = "latest ({})".format(commit)
+else:
+    tag, revision, commit = pkg_version, None, None
+    release = tag
+    version = "stable ({})".format(release)
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.linkcode",
     "sphinx.ext.mathjax",
-    "sphinx.ext.viewcode",
+    "sphinxrun",
     "nbsphinx",
 ]
 
@@ -29,30 +49,72 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 autodoc_typehints = "description"
 autodoc_member_order = "bysource"
 autosummary_generate = True
-nbsphinx_execute = "always"
+
+autodoc_default_options = {
+    'member-order': 'bysource',
+}
 
 intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "pillow": ("https://pillow.readthedocs.io/en/stable/", None),
 }
+
+nbsphinx_execute = "always"
+
+plot_working_directory = project_root
+plot_html_show_formats = False
+plot_html_show_source_link = False
+plot_formats = [(".jpeg", 200)]
+
+# -- Options for Linkcode extension -------------------------------------------
+
+if revision is not None:
+    linkcode_revision = f"v{tag}-{revision}-{commit}"
+else:
+    linkcode_revision = f"v{tag}"
+linkcode_url = (
+    "https://github.com/CEA-LIST/tri3d/blob/"
+    + linkcode_revision
+    + "/{filepath}#L{linestart}-L{linestop}"
+)
+
+
+def linkcode_resolve(domain, info):
+    if domain != "py" or not info["module"]:
+        return None
+
+    mod = importlib.import_module(info["module"])
+
+    obj = mod
+    for part in info["fullname"].split("."):
+        try:
+            obj = getattr(obj, part)
+        except Exception:
+            return None
+
+    try:
+        filepath = inspect.getsourcefile(obj)
+        if filepath is None:
+            return
+        filepath = os.path.relpath(filepath, project_root)
+    except Exception:
+        return None
+
+    try:
+        source, lineno = inspect.getsourcelines(obj)
+    except OSError:
+        return None
+    else:
+        linestart, linestop = lineno, lineno + len(source) - 1
+
+    return linkcode_url.format(
+        filepath=filepath, linestart=linestart, linestop=linestop
+    )
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-html_theme_options = {
-    "footer_icons": [
-        {
-            "name": "GitHub",
-            "url": "https://github.com/CEA-LIST/tri3d",
-            "html": """
-                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
-                </svg>
-            """,
-            "class": "",
-        },
-    ],
-}
 html_static_path = ["_static"]

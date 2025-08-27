@@ -66,6 +66,19 @@ class Waymo(Dataset):
     it returns lidar frames for which 3D segmentation is available.
 
     .. [1] https://github.com/waymo-research/waymo-open-dataset/blob/5f8a1cd42491210e7de629b6f8fc09b65e0cbe99/src/waymo_open_dataset/dataset.proto#L285
+
+    .. run::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from tri3d.datasets import Waymo
+
+        plt.switch_backend("Agg")
+
+        dataset = Waymo("datasets/waymo")
+        name = "tri3d.datasets.Waymo"
+        camera, imgcoords, lidar = "CAM_FRONT", "IMG_FRONT", "LIDAR_TOP"
+        seq, frame, cam_frame = 0, 24, 24
     """
 
     _default_cam_sensor = "CAM_FRONT"
@@ -576,11 +589,6 @@ class Waymo(Dataset):
         return self.timelines[seq][sensor]
 
     def image(self, seq, frame, sensor):
-        """Return image from given camera at given frame.
-
-        A default sensor (for instance a front facing camera) should be
-        provided for convenience.
-        """
         record = self.records[seq]
         pose_timestamp = self.timelines[seq][sensor][frame]
         camera_name = 1 + self.cam_sensors.index(sensor.replace("IMG", "CAM"))
