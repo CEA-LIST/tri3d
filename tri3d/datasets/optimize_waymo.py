@@ -1,19 +1,15 @@
-"""Re-encode Waymo parquet files with better settings to optimize random access.
+"""Re-encode Waymo parquet files with better settings to optimize random
+access.
 
-The script can be called again if it is stopped or crashes, it will skip 
-already converted files.
-It will use **a lot** of RAM.
+The script can be called again if it is stopped or crashes, it will skip
+already converted files. It will use **a lot** of RAM.
 """
 
 import argparse
 import os
 import pathlib
-import random
 from concurrent.futures import ProcessPoolExecutor
 
-import pyarrow
-import pyarrow.compute as pc
-import pyarrow.dataset
 import pyarrow.parquet as pq
 import tqdm
 
@@ -77,29 +73,31 @@ def convert_file(source: pathlib.Path, destination: pathlib.Path):
 
     tmpdest = destination.parent / (destination.name + ".tmp")
 
+    tmpdest.parent.mkdir(parents=True, exist_ok=True)
+
     record_type = os.path.basename(os.path.dirname(source))
 
-    ds = pyarrow.dataset.dataset(source)
-    order = pc.sort_indices(
-        ds.to_table(SORTING_COLUMNS[record_type]),
-        sort_keys=[(c, "ascending") for c in SORTING_COLUMNS[record_type]],
-    ).to_numpy()
-
-    table = pyarrow.dataset.dataset(source).take(order)
+    table = pq.ParquetFile(source, memory_map=True).read()
+    table = table.sort_by([(c, "ascending") for c in SORTING_COLUMNS[record_type]])
 
     pq.write_table(
         table,
         tmpdest,
         row_group_size=(
-            2 if record_type in ["lidar", "camera_image", "lidar_pose"] else 1024
+            1 if record_type in ["lidar", "camera_image", "lidar_pose"] else 1024
         ),
-        # compression={
-        #     c + (".list.element" if c.endswith(".values") else ""): "BROTLI"
-        #     if c in COMPRESSED_COLUMNS
-        #     else "NONE"
-        #     for c in table.schema.names
-        # },
-        compression="ZSTD",
+        # compression="ZSTD",
+        compression={
+            c + (".list.element" if c.endswith(".values") else ""): "ZSTD"
+            if c in COMPRESSED_COLUMNS
+            else "NONE"
+            for c in table.schema.names
+        },
+        compression_level={
+            c + (".list.element" if c.endswith(".values") else ""): 4
+            for c in table.schema.names
+            if c in COMPRESSED_COLUMNS
+        },
         sorting_columns=[
             pq.SortingColumn(table.schema.names.index(c))
             for c in SORTING_COLUMNS[record_type]
@@ -123,7 +121,7 @@ def main():
     args = argparser.parse_args()
 
     sources: list[pathlib.Path] = list(args.input.glob("**/*.parquet"))
-    random.shuffle(sources)
+    sources = sorted(sources, key=lambda s: (s.name, s.parent.name))
 
     destinations = [args.output / s.relative_to(args.input) for s in sources]
 
