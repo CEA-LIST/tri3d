@@ -131,17 +131,15 @@ class SemanticKITTI(Dataset):
                         continue
 
                     what, *values = line.split()
-                    calibs[what] = np.eye(4, dtype=np.float32)
+                    calibs[what] = np.eye(4)
                     calibs[what][:3, :] = np.array([float(x) for x in values]).reshape(
                         3, 4
                     )
 
             path = self.root / seq / "poses.txt"
-            poses_ = np.loadtxt(path, dtype=np.float32).reshape(-1, 3, 4)
-            n = poses_.shape[0]
-            poses = np.tile(np.eye(4, dtype=np.float32), (n, 1, 1))
+            poses_ = np.loadtxt(path).reshape(-1, 3, 4)
+            poses = np.tile(np.eye(4), [poses_.shape[0], 1, 1])
             poses[:, :3, :] = poses_
-
             poses = np.linalg.inv(calibs["Tr:"]) @ poses @ calibs["Tr:"]
             poses = RigidTransform.from_matrix(poses)
 
