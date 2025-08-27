@@ -1,7 +1,7 @@
 import dataclasses
 import io
 import pathlib
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 import pyarrow.parquet as pq

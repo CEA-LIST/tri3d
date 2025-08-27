@@ -55,7 +55,8 @@ else:
         """Add 3D boxes to a k3d plot.
 
         :param plot: k3d plot
-        :param transform: N object local to scene coordinate transformations.
+        :param transform: N object local to scene coordinate
+            transformations.
         :param sizes: N by 3 array of object sizes
         :param c: edge colors, either as a single or per box value.
         """
@@ -204,17 +205,12 @@ else:
 def auto_range(x, percentile=0.1, nticks=7, start=None, stop=None):
     """Propose histogram bins (start, stop, step) which best describe data.
 
-    :param x:
-        a list of scalar values
-    :param percentile:
-        *percentage* of edge values that can be ignored, or two values
-        to distinguish left and right margins
-    :param nticks:
-        number of ticks to aim for
-    :param start:
-        overrides the start value from automatic range
-    :param stop:
-        overrides the stop value from automatic range
+    :param x: a list of scalar values
+    :param percentile: *percentage* of edge values that can be ignored,
+        or two values to distinguish left and right margins
+    :param nticks: number of ticks to aim for
+    :param start: overrides the start value from automatic range
+    :param stop: overrides the stop value from automatic range
     """
     if len(x) < 2:
         return 0, 1, 0.1

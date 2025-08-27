@@ -116,7 +116,7 @@ def lr_bisect(a: np.ndarray, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]: ..
 
 
 def lr_bisect(a, x):
-    """return the indices of the surrounding values of x in a.
+    """Return the indices of the surrounding values of x in a.
 
     TODO: document left of left and right of right cases
     """

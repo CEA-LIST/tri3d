@@ -278,7 +278,7 @@ class Rotation(Transformation):
 
 
 class Translation(Transformation):
-    """Translatation"""
+    """Translatation."""
 
     def __init__(self, vec):
         self.vec = np.asarray(vec)
@@ -359,12 +359,9 @@ class RigidTransform(Transformation):
     def interpolate(cls, p1: Self, p2: Self, w: float | np.ndarray):
         """Linearly interpolate between two transformations.
 
-        :param p1:
-            Left transformation
-        :param p2:
-            Right transformations
-        :param w:
-            Interpolation ratio such that 0. -> p1, 1. -> p2.
+        :param p1: Left transformation
+        :param p2: Right transformations
+        :param w: Interpolation ratio such that 0. -> p1, 1. -> p2.
         """
         w = np.asarray(w)  # type: ignore
         q = quaternion.slerp(p1.rotation.quat, p2.rotation.quat, w)
@@ -504,7 +501,8 @@ def where_in_box(pts, size, box2sensor: Transformation) -> np.ndarray:
 
     :param pts: N by 3 array of point coordinates
     :param size: (l, w, h) triplet size of the box
-    :param box2sensor: transformation from box local to sensor coordinates
+    :param box2sensor: transformation from box local to sensor
+        coordinates
     """
     # credit to https://math.stackexchange.com/a/1552579 and nuscene-devkit for
     # the method.
@@ -531,22 +529,3 @@ def test_box_in_frame(obj2img: Transformation, obj_size, img_size) -> bool:
         & np.all(pts_2d[:, :2] < [img_size], axis=1)
     )
     return any(in_frame)
-
-
-# def bbox_2d(obj2img, size, imsize):
-#     """Return the 2D bounding box for a 3D box projected onto an image."""
-#     size = np.asarray(size)
-#     imsize = tuple(imsize)
-
-#     edges_25d = obj2img.apply(cube_edges * size[None, :])
-#     zmax = max(edges_25d[:, 2])
-
-#     # filter in frame
-#     box_25d = shapely.geometry.MultiPoint(edges_25d).convex_hull
-#     visible_space = shapely.geometry.MultiPoint(
-#         [(0, 0, 0), imsize + (0,), (0, 0, zmax)]
-#     ).envelope
-#     box_visible = box_25d.intersection(visible_space).envelope
-#     edges_2d = np.array(box_visible.exterior.coords)
-
-#     return tuple(edges_2d.min(0)) + tuple(edges_2d.max(0))

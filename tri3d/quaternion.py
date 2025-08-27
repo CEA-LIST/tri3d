@@ -230,13 +230,11 @@ def rotation_matrix_nb(Q, mat):
 
 
 def rotation_matrix(Q):
-    """
-    Covert a quaternion into a full three-dimensional rotation matrix.
+    """Covert a quaternion into a full three-dimensional rotation matrix.
 
-    :param Q:
-        (Nx)4 element array representing the quaternion (q0,q1,q1,q3)
-    :return:
-        A (Nx)3x3 element matrix representing the 3D rotation.
+    :param Q: (Nx)4 element array representing the quaternion
+        (q0,q1,q1,q3)
+    :return: A (Nx)3x3 element matrix representing the 3D rotation.
     """
     out = np.empty(Q.shape[:-1] + (3, 3), dtype=Q.dtype)
     rotation_matrix_nb(np.asarray(Q), out)

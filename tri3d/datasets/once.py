@@ -41,6 +41,7 @@ class Once(Dataset):
     ]
     pcl_sensors = ["lidar_roof"]
     det_labels = ["Car", "Truck", "Bus", "Pedestrian", "Cyclist"]
+    sem_labels = []
 
     _default_img_sensor = "cam01"
     _default_pcl_sensor = "lidar_roof"

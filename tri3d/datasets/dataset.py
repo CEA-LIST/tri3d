@@ -60,12 +60,15 @@ class AbstractDataset(ABC):
 
     @abstractmethod
     def sequences(self) -> list[int]:
-        """Return the list of sequences/recordings indices (0..num_sequences)."""
+        """Return the list of sequences/recordings indices
+        (0..num_sequences)."""
         ...
 
     @abstractmethod
     def frames(self, seq: int, sensor: str) -> np.ndarray:
-        """Return the frames in the dataset or a particular sequence.
+        """Return the frames indices of particular sequence for a sensor.
+
+        The indices are normally contiguous (ie: :func:`np.arange`).
 
         :param seq:
             Sequence index.
@@ -88,7 +91,7 @@ class AbstractDataset(ABC):
         :return:
             An array of timestamps.
 
-        .. note:: frames are guarenteed to be sorted.
+        .. note:: frames are guaranteed to be sorted.
         """
         ...
 
@@ -120,7 +123,8 @@ class AbstractDataset(ABC):
         frame: int | tuple[int, int],
         coords: str | tuple[str, str],
     ) -> Transformation:
-        """Return the transformation from one coordinate system and timestamp to another.
+        """Return the transformation from one coordinate system and timestamp
+        to another.
 
         :param seq:
             Sequence index.
@@ -233,12 +237,9 @@ class AbstractDataset(ABC):
     def semantic2d(self, seq: int, frame: int, sensor: str):
         """Return pixelwise class annotations.
 
-        :param seq:
-            Sequence index.
-        :param frame:
-            Frame index.
-        :return:
-            array of pointwise class label
+        :param seq: Sequence index.
+        :param frame: Frame index.
+        :return: array of pointwise class label
         """
         ...
 
@@ -259,15 +260,12 @@ class AbstractDataset(ABC):
     def instances2d(self, seq: int, frame: int, sensor: str):
         """Return pixelwise instance annotations.
 
-        Background label pixels will contain -1. Other instance ids will follow
-        dataset-specific rules.
+        Background label pixels will contain -1. Other instance ids will
+        follow dataset-specific rules.
 
-        :param seq:
-            Sequence index.
-        :param frame:
-            Frame index.
-        :return:
-            array of pointwise instance label
+        :param seq: Sequence index.
+        :param frame: Frame index.
+        :return: array of pointwise instance label
         """
         ...
 
@@ -302,10 +300,12 @@ class Dataset(AbstractDataset):
     @abstractmethod
     def _boxes(self, seq: int) -> list[Box]: ...
 
-    def frames(self, seq, sensor):
+    def frames(self, seq: int, sensor: str) -> np.ndarray:
         return np.arange(len(self.timestamps(seq, sensor)))
 
-    def poses(self, seq, sensor, timeline=None):
+    def poses(
+        self, seq: int, sensor: str, timeline: str | None = None
+    ) -> RigidTransform:
         if sensor in self.img_sensors:
             sensor = self.cam_sensors[self.img_sensors.index(sensor)]
 
@@ -345,7 +345,12 @@ class Dataset(AbstractDataset):
 
         return RigidTransform.interpolate(poses[i1], poses[i2], alpha)
 
-    def alignment(self, seq, frame, coords) -> Transformation:
+    def alignment(
+        self,
+        seq: int,
+        frame: int | tuple[int, int],
+        coords: str | tuple[str, str],
+    ) -> Transformation:
         # normalize arguments
         if isinstance(frame, int):
             src_frame, dst_frame = frame, frame
@@ -371,10 +376,12 @@ class Dataset(AbstractDataset):
             @ self.poses(seq, src_coords)[src_frame]
         )
 
-    def image(self, seq, frame, sensor):
+    def image(self, seq: int, frame: int, sensor: str) -> Image:
         raise NotImplementedError
 
-    def points(self, seq, frame, sensor=None, coords=None) -> np.ndarray:
+    def points(
+        self, seq: int, frame: int, sensor: str, coords: str | None = None
+    ) -> np.ndarray:
         if sensor is None:
             sensor = self._default_pcl_sensor
 
@@ -393,7 +400,7 @@ class Dataset(AbstractDataset):
             points[:, :3] = transform.apply(points[:, :3])
             return points
 
-    def boxes(self, seq, frame, coords=None) -> list[type[Box]]:
+    def boxes(self, seq: int, frame: int, coords: str) -> Sequence[type[Box]]:
         if coords is None:
             coords = self._default_box_coords
 
@@ -491,17 +498,17 @@ class Dataset(AbstractDataset):
 
         return out
 
-    def rectangles(self, seq, frame):
+    def rectangles(self, seq: int, frame: int, sensor: str):
         raise NotImplementedError
 
-    def semantic(self, seq, frame, sensor):
+    def semantic(self, seq: int, frame: int, sensor: str):
         raise NotImplementedError
 
-    def semantic2d(self, seq, frame, sensor):
+    def semantic2d(self, seq: int, frame: int, sensor: str):
         raise NotImplementedError
 
-    def instances(self, seq, frame, sensor):
+    def instances(self, seq: int, frame: int, sensor: str):
         raise NotImplementedError
 
-    def instances2d(self, seq, frame, sensor):
+    def instances2d(self, seq: int, frame: int, sensor: str):
         raise NotImplementedError

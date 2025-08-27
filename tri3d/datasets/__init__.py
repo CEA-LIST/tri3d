@@ -10,6 +10,7 @@ __all__ = [
     "Dataset",
     "Box",
     "NuScenes",
+    "dump_nuscene_boxes",
     "Once",
     "SemanticKITTI",
     "Waymo",

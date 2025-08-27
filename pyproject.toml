@@ -1,12 +1,43 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+
+requires = [ "setuptools", "setuptools-scm" ]
 
 [project]
 name = "tri3d"
-authors = [{ name = "Nicolas Granger", email = "nicolas.granger@cea.fr" }]
 description = "A unified interface to various 3D driving datasets"
 readme = "README.md"
+license = "CECILL-C"
+authors = [ { name = "Nicolas Granger", email = "nicolas.granger@cea.fr" } ]
+requires-python = ">=3.11"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dynamic = [ "version" ]
+
+dependencies = [ "numba", "numpy", "pillow", "pyarrow" ]
+optional-dependencies.align_nuscenes = [ "torch", "torch-cluster", "tqdm" ]
+optional-dependencies.plot = [ "k3d", "matplotlib" ]
+
+[dependency-groups]
+dev = [
+  "docformatter",
+  "furo",
+  "ipykernel",
+  "ipympl",
+  "ipywidgets",
+  "matplotlib",
+  "nbsphinx",
+  "nbstripout",
+  "pyproject-fmt>=2.6",
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "scipy",
+  "sphinx",
 requires-python = ">=3.10"
 keywords = []
 license = { text = "CECILL-C" }
@@ -17,51 +48,36 @@ dynamic = ["version"]
 [project.optional-dependencies]
 plot = ["matplotlib", "k3d"]
 align_nuscenes = ["torch", "torch-cluster", "tqdm"]
+]
 
 [tool.setuptools]
-packages = ["tri3d"]
+packages = [ "tri3d" ]
 
 [tool.setuptools_scm]
 
+[tool.ruff]
+extend-include = [ "*.ipynb" ]
+
+lint.extend-select = [ "I" ]
+lint.fixable = [ "ALL" ]
+
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [ "tests" ]
 
 [tool.coverage.report]
 exclude_lines = [
-    "@abstractmethod",
-    "__repr__",
-    "raise ValueError",
-    "raise NotImplementedError",
+  "@abstractmethod",
+  "__repr__",
+  "raise ValueError",
+  "raise NotImplementedError",
 ]
-
-[tool.ruff]
-extend-include = ["*.ipynb"]
-
-[tool.ruff.lint]
-fixable = ["ALL"]
-extend-select = ["I"]
 
 [[tool.uv.index]]
 name = "pyg"
 url = "https://data.pyg.org/whl/torch-2.7.0+cu126.html"
-ignore-error-codes = [403]
+ignore-error-codes = [ 403 ]
 format = "flat"
 
 [tool.uv.sources]
 torch-scatter = { index = "pyg" }
 torch-cluster = { index = "pyg" }
-
-[dependency-groups]
-dev = [
-    "furo",
-    "ipykernel",
-    "ipympl",
-    "ipywidgets",
-    "nbsphinx",
-    "nbstripout",
-    "pytest",
-    "pytest-cov",
-    "ruff",
-    "scipy",
-    "sphinx",
-]
