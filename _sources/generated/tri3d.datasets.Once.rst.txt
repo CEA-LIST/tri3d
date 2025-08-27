@@ -1,0 +1,9 @@
+﻿Once
+====
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Once
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   

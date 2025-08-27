@@ -1,0 +1,9 @@
+﻿where\_in\_box
+==============
+
+.. currentmodule:: tri3d.geometry
+
+.. autofunction:: where_in_box
+    
+    
+   

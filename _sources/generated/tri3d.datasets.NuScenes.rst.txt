@@ -1,0 +1,9 @@
+﻿NuScenes
+========
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: NuScenes
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   
