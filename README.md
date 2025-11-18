@@ -13,7 +13,7 @@ It aims to address the following objectives:
 
 As of now, Tri3D supports the following datasets:
 
-- [Argoverse 2](https://cea-list.github.io/tri3d/generated/tri3d.datasets.Argoverse.html)
+- [Argoverse 2](https://cea-list.github.io/tri3d/generated/tri3d.datasets.Argoverse2.html)
 - [NuScenes](https://cea-list.github.io/tri3d/generated/tri3d.datasets.NuScenes.html)
 - [ONCE Dataset](https://cea-list.github.io/tri3d/generated/tri3d.datasets.Once.html)
 - [Semantic KITTI](https://cea-list.github.io/tri3d/generated/tri3d.datasets.SemanticKITTI.html)
