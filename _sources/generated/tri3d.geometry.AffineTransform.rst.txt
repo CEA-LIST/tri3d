@@ -1,0 +1,9 @@
+﻿AffineTransform
+===============
+
+.. currentmodule:: tri3d.geometry
+
+.. autoclass:: AffineTransform
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   

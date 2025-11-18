@@ -1,0 +1,9 @@
+﻿test\_box\_in\_frame
+====================
+
+.. currentmodule:: tri3d.geometry
+
+.. autofunction:: test_box_in_frame
+    
+    
+   

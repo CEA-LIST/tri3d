@@ -1,0 +1,9 @@
+﻿AbstractDataset
+===============
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: AbstractDataset
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   

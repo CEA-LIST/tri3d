@@ -1,0 +1,9 @@
+﻿Argoverse2
+==========
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Argoverse2
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   

@@ -1,0 +1,9 @@
+﻿Box
+===
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Box
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   

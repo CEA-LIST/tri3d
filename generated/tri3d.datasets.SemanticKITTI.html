@@ -1,0 +1,701 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Waymo" href="tri3d.datasets.Waymo.html" /><link rel="prev" title="Once" href="tri3d.datasets.Once.html" />
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
+        <title>SemanticKITTI - tri3d 0.2.2 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=302659d7" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">tri3d 0.2.2 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  
+  <span class="sidebar-brand-text">tri3d 0.2.2 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_preparation.html">Data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../example.html">Getting started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Package reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../datasets.html">tri3d.datasets</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of tri3d.datasets</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.Box.html">Box</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.AbstractDataset.html">AbstractDataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.Argoverse2.html">Argoverse2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.NuScenes.html">NuScenes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.Once.html">Once</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">SemanticKITTI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.Waymo.html">Waymo</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.datasets.ZODFrames.html">ZODFrames</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../geometry.html">tri3d.geometry</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of tri3d.geometry</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.Transformation.html">Transformation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.AffineTransform.html">AffineTransform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.Pipeline.html">Pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.Rotation.html">Rotation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.Translation.html">Translation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.RigidTransform.html">RigidTransform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.where_in_box.html">where_in_box</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tri3d.geometry.test_box_in_frame.html">test_box_in_frame</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../plot.html">tri3d.plot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">External links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/CEA-LIST/tri3d">Github repository</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://pypi.org/project/tri3d">PyPi package</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/generated/tri3d.datasets.SemanticKITTI.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="semantickitti">
+<h1>SemanticKITTI<a class="headerlink" href="#semantickitti" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tri3d.datasets.</span></span><span class="sig-name descname"><span class="pre">SemanticKITTI</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sequences</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['00',</span> <span class="pre">'01',</span> <span class="pre">'02',</span> <span class="pre">'03',</span> <span class="pre">'04',</span> <span class="pre">'05',</span> <span class="pre">'06',</span> <span class="pre">'07',</span> <span class="pre">'09',</span> <span class="pre">'10']</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/semantickitti.py#L51-L182"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI" title="Link to this definition">¶</a></dt>
+<dd><p><a class="reference external" href="https://semantic-kitti.org">SemanticKITTI</a> dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>sequences</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.cam_sensors">
+<span class="sig-name descname"><span class="pre">cam_sensors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.cam_sensors" title="Link to this definition">¶</a></dt>
+<dd><p>Camera names.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.img_sensors">
+<span class="sig-name descname"><span class="pre">img_sensors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.img_sensors" title="Link to this definition">¶</a></dt>
+<dd><p>Camera names (image plane coordinate).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.pcl_sensors">
+<span class="sig-name descname"><span class="pre">pcl_sensors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['velodyne']</span></em><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.pcl_sensors" title="Link to this definition">¶</a></dt>
+<dd><p>Point cloud sensor names.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.det_labels">
+<span class="sig-name descname"><span class="pre">det_labels</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.det_labels" title="Link to this definition">¶</a></dt>
+<dd><p>Detection labels.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.sem_labels">
+<span class="sig-name descname"><span class="pre">sem_labels</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['unlabeled',</span> <span class="pre">'outlier',</span> <span class="pre">'car',</span> <span class="pre">'bicycle',</span> <span class="pre">'bus',</span> <span class="pre">'motorcycle',</span> <span class="pre">'on-rails',</span> <span class="pre">'truck',</span> <span class="pre">'other-vehicle',</span> <span class="pre">'person',</span> <span class="pre">'bicyclist',</span> <span class="pre">'motorcyclist',</span> <span class="pre">'road',</span> <span class="pre">'parking',</span> <span class="pre">'sidewalk',</span> <span class="pre">'other-ground',</span> <span class="pre">'building',</span> <span class="pre">'fence',</span> <span class="pre">'other-structure',</span> <span class="pre">'lane-marking',</span> <span class="pre">'vegetation',</span> <span class="pre">'trunk',</span> <span class="pre">'terrain',</span> <span class="pre">'pole',</span> <span class="pre">'traffic-sign',</span> <span class="pre">'other-object',</span> <span class="pre">'moving-car',</span> <span class="pre">'moving-bicyclist',</span> <span class="pre">'moving-person',</span> <span class="pre">'moving-motorcyclist',</span> <span class="pre">'moving-on-rails',</span> <span class="pre">'moving-bus',</span> <span class="pre">'moving-truck',</span> <span class="pre">'moving-other-vehicle']</span></em><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.sem_labels" title="Link to this definition">¶</a></dt>
+<dd><p>Segmentation labels.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.sequences">
+<span class="sig-name descname"><span class="pre">sequences</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/semantickitti.py#L168-L169"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.sequences" title="Link to this definition">¶</a></dt>
+<dd><p>Return the list of sequences/recordings indices
+(0..num_sequences).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.timestamps">
+<span class="sig-name descname"><span class="pre">timestamps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'velodyne'</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/semantickitti.py#L171-L172"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.timestamps" title="Link to this definition">¶</a></dt>
+<dd><p>Return the frame timestamps for a given sensor .</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> – Sequence index.</p></li>
+<li><p><strong>sensor</strong> – Sensor name.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An array of timestamps.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>frames are guaranteed to be sorted.</p>
+</div>
+<figure class="align-default">
+<img alt="../_images/tri3d.datasets.SemanticKITTI.timestamps.jpg" src="../_images/tri3d.datasets.SemanticKITTI.timestamps.jpg" />
+</figure>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.semantic">
+<span class="sig-name descname"><span class="pre">semantic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'velodyne'</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/semantickitti.py#L178-L179"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.semantic" title="Link to this definition">¶</a></dt>
+<dd><p>Return pointwise class annotations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> – Sequence index.</p></li>
+<li><p><strong>frame</strong> – Frame index.</p></li>
+<li><p><strong>sensor</strong> – The camera sensor for which annotations are returned.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>array of pointwise class label</p>
+</dd>
+</dl>
+<figure class="align-default">
+<img alt="../_images/tri3d.datasets.SemanticKITTI.semantic.jpg" src="../_images/tri3d.datasets.SemanticKITTI.semantic.jpg" />
+</figure>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.instances">
+<span class="sig-name descname"><span class="pre">instances</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'velodyne'</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/semantickitti.py#L181-L182"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.instances" title="Link to this definition">¶</a></dt>
+<dd><p>Return pointwise instance ids.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> – Sequence index.</p></li>
+<li><p><strong>frame</strong> – Frame index.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>array of pointwise instance label</p>
+</dd>
+</dl>
+<figure class="align-default">
+<img alt="../_images/tri3d.datasets.SemanticKITTI.instances.jpg" src="../_images/tri3d.datasets.SemanticKITTI.instances.jpg" />
+</figure>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.alignment">
+<span class="sig-name descname"><span class="pre">alignment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coords</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L528-L557"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.alignment" title="Link to this definition">¶</a></dt>
+<dd><p>Return the transformation from one coordinate system and timestamp
+to another.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em><em> | </em><em>tuple</em><em>[</em><em>int</em><em>, </em><em>int</em><em>]</em>) – Either a single frame or a (src, dst) tuple. The frame is respective
+to the sensor timeline as specified by <cite>coords</cite>.</p></li>
+<li><p><strong>coords</strong> (<em>str</em><em> | </em><em>tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em>) – Either a single sensor/coordinate system or a (src, dst) tuple.
+The transformation also accounts for mismatches in sensor timelines
+and movement of the ego-car.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A transformation that projects points from one coordinate
+system at one frame to another.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="tri3d.geometry.Transformation.html#tri3d.geometry.Transformation" title="tri3d.geometry.Transformation"><em>Transformation</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.boxes">
+<span class="sig-name descname"><span class="pre">boxes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coords</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L583-L679"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.boxes" title="Link to this definition">¶</a></dt>
+<dd><p>Return the 3D box annotations.</p>
+<p>This function will interpolate and transform annotations if necessary in order
+to match the requested coordinate system and timeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em>) – Frame index.</p></li>
+<li><p><strong>coords</strong> (<em>str</em>) – The coordinate system and timeline to use.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of box annotations.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Sequence</em>[type[<a class="reference internal" href="tri3d.datasets.Box.html#tri3d.datasets.Box" title="tri3d.datasets.dataset.Box"><em>Box</em></a>]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.frames">
+<span class="sig-name descname"><span class="pre">frames</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L483-L484"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.frames" title="Link to this definition">¶</a></dt>
+<dd><p>Return the frames indices of particular sequence for a sensor.</p>
+<p>The indices are normally contiguous (ie: <code class="xref py py-func docutils literal notranslate"><span class="pre">np.arange()</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>seq</strong> – Sequence index.</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of (sequence, frame) index tuples sorted by sequence and
+frame.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.image">
+<span class="sig-name descname"><span class="pre">image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L559-L560"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.image" title="Link to this definition">¶</a></dt>
+<dd><p>Return image from given camera at given frame.</p>
+<p>A default sensor (for instance a front facing camera) should be
+provided for convenience.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em>) – Frame index.</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>) – The image sensor to use.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image" title="(in Pillow (PIL Fork) v12.0.0)"><em>Image</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.instances2d">
+<span class="sig-name descname"><span class="pre">instances2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L693-L694"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.instances2d" title="Link to this definition">¶</a></dt>
+<dd><p>Return pixelwise instance annotations.</p>
+<p>Background label pixels will contain -1. Other instance ids will
+follow dataset-specific rules.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em>) – Frame index.</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>array of pointwise instance label</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.points">
+<span class="sig-name descname"><span class="pre">points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coords</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L562-L581"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.points" title="Link to this definition">¶</a></dt>
+<dd><p>Return an array of 3D point coordinates from lidars.</p>
+<p>The first three columns contains xyz coordinates, additional columns
+are dataset-specific.</p>
+<p>For convenience, the point cloud can be returned in the coordinate
+system of another sensor. In that case, <cite>frame</cite> is understood as the
+frame for that sensor and the point cloud which has the nearest
+timestamp is retrieved and aligned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em>) – Frame index.</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>) – The 3D sensor (generally a LiDAR) to use.</p></li>
+<li><p><strong>coords</strong> (<em>str</em><em> | </em><em>None</em>) – The coordinate system and timeline to use. Defaults to the sensor.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A NxD array where the first 3 columns are X, Y, Z point coordinates
+and the remaining ones are dataset-specific.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>ndarray</em></p>
+</dd>
+</dl>
+<figure class="align-default">
+<img alt="../_images/tri3d.datasets.SemanticKITTI.points.jpg" src="../_images/tri3d.datasets.SemanticKITTI.points.jpg" />
+</figure>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.poses">
+<span class="sig-name descname"><span class="pre">poses</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L486-L526"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.poses" title="Link to this definition">¶</a></dt>
+<dd><p>Return all sensor to world transforms for a sensor.</p>
+<p><em>World</em> references an arbitrary coordinate system for a sequence, not
+all datasets provide an actual global coordinate system.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>) – Sensor name.</p></li>
+<li><p><strong>timeline</strong> (<em>str</em><em> | </em><em>None</em>) – When specified, the sensor poses will be interpolated to the
+timestamps of that timeline if necessary.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sensor poses as a batched transform.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="tri3d.geometry.RigidTransform.html#tri3d.geometry.RigidTransform" title="tri3d.geometry.RigidTransform"><em>RigidTransform</em></a></p>
+</dd>
+</dl>
+<figure class="align-default">
+<img alt="../_images/tri3d.datasets.SemanticKITTI.poses.jpg" src="../_images/tri3d.datasets.SemanticKITTI.poses.jpg" />
+</figure>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.rectangles">
+<span class="sig-name descname"><span class="pre">rectangles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L681-L682"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.rectangles" title="Link to this definition">¶</a></dt>
+<dd><p>Return a list of 2D rectangle annotations.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The default coordinate system should be documented.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em>) – Frame index or <cite>None</cite> to request annotations for the whole sequence</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of 2D annotations.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tri3d.datasets.SemanticKITTI.semantic2d">
+<span class="sig-name descname"><span class="pre">semantic2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensor</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/CEA-LIST/tri3d/blob/v0.2.2/tri3d/datasets/dataset.py#L687-L688"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tri3d.datasets.SemanticKITTI.semantic2d" title="Link to this definition">¶</a></dt>
+<dd><p>Return pixelwise class annotations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seq</strong> (<em>int</em>) – Sequence index.</p></li>
+<li><p><strong>frame</strong> (<em>int</em>) – Frame index.</p></li>
+<li><p><strong>sensor</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>array of pointwise class label</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="tri3d.datasets.Waymo.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Waymo</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="tri3d.datasets.Once.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Once</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2024, Nicolas Granger
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">SemanticKITTI</a><ul>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI</span></code></a><ul>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.cam_sensors"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.cam_sensors</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.img_sensors"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.img_sensors</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.pcl_sensors"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.pcl_sensors</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.det_labels"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.det_labels</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.sem_labels"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.sem_labels</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.sequences"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.sequences()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.timestamps"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.timestamps()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.semantic"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.semantic()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.instances"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.instances()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.alignment"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.alignment()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.boxes"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.boxes()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.frames"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.frames()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.image"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.image()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.instances2d"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.instances2d()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.points"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.points()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.poses"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.poses()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.rectangles"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.rectangles()</span></code></a></li>
+<li><a class="reference internal" href="#tri3d.datasets.SemanticKITTI.semantic2d"><code class="docutils literal notranslate"><span class="pre">SemanticKITTI.semantic2d()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=000c92bf"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=5fa4622c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    </body>
+</html>

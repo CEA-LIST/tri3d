@@ -1,0 +1,9 @@
+﻿Waymo
+=====
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: Waymo
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   

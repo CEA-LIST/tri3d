@@ -1,0 +1,9 @@
+﻿SemanticKITTI
+=============
+
+.. currentmodule:: tri3d.datasets
+
+.. autoclass:: SemanticKITTI
+    :inherited-members:
+    :special-members: __matmul__, __len__
+   
