@@ -5,6 +5,7 @@ import pytest
 
 from tri3d.datasets import (
     AbstractDataset,
+    Argoverse2,
     NuScenes,
     Once,
     SemanticKITTI,
@@ -13,7 +14,9 @@ from tri3d.datasets import (
 )
 
 
-@pytest.fixture(scope="module", params=[NuScenes, Once, SemanticKITTI, Waymo, ZODFrames])
+@pytest.fixture(
+    scope="module", params=[Argoverse2, NuScenes, Once, SemanticKITTI, Waymo, ZODFrames]
+)
 def dataset(request) -> AbstractDataset:
     cls = request.param
     return cls(pathlib.Path(__file__).parent.parent / "datasets" / cls.__name__.lower())

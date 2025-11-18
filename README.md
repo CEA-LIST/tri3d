@@ -2,39 +2,42 @@
 
 ![Waymo sample](docs/source/waymo.jpg)
 
-Tri3D facilitates the utilization of 3D driving datasets by providing:
+Tri3D provides a library to manipulate various 3D driving datasets under a unified API with common conventions.
 
--   A common coordinate and data encoding convention.
--   A common API to read data form various datasets.
--   Fast non-sequential access to any sensor sample at any frame index.
--   A convenient access to geometric transformations between sensors and
-    timestamps.
--   Plotting utilities.
+It aims to address the following objectives:
+
+- Make datasets **interchangeable**.
+- Enforce **common coordinate and data format convention**.
+- Provide **fast non-sequential access to samples** at any given frame.
+- **Simplify geometric transformations** between sensors and timestamps.
 
 As of now, Tri3D supports the following datasets:
 
-- [NuScenes](https://www.nuscenes.org/nuscenes)
-- [ONCE Dataset](https://once-for-auto-driving.github.io)
-- [Semantic KITTI](https://semantic-kitti.org)
-- [Waymo open dataset](https://waymo.com/open)
-- [Zenseact Open Dataset](https://zod.zenseact.com/frames)
+- [Argoverse 2](https://cea-list.github.io/tri3d/generated/tri3d.datasets.Argoverse.html)
+- [NuScenes](https://cea-list.github.io/tri3d/generated/tri3d.datasets.NuScenes.html)
+- [ONCE Dataset](https://cea-list.github.io/tri3d/generated/tri3d.datasets.Once.html)
+- [Semantic KITTI](https://cea-list.github.io/tri3d/generated/tri3d.datasets.SemanticKITTI.html)
+- [Waymo open dataset](https://cea-list.github.io/tri3d/generated/tri3d.datasets.Waymo.html)
+- [Zenseact Open Dataset](https://cea-list.github.io/tri3d/generated/tri3d.datasets.ZODFrames.html)
+
+The documentation is hosted at: https://cea-list.github.io/tri3d/
 
 ## Conventions
 
 The following conventions are adopted across all datasets :
 
--   An object **position** designates the center of its bounding box.
--   In the **local coordinate system of an object**, the x axis points
-    forward, y leftward, and z updward.
--   **Length, width and height** are the dimensions of the object along
-    x, y and z axes respectively.
--   In **camera sensor coordinates**, x points rightward, y points
-    downward, z point forward.
--   In **image coordinates**, x is the pixel column index starting from
-    the left, y is the pixel row index starting from the top, z is the
-    depth in meters along the optical axis.
--   In **lidar coordinates**, x points in the same direction as the ego
-    car, y points leftward, z points upward.
+- An object **position** designates the center of its bounding box.
+- In the **local coordinate system of an object**, the x axis points
+  forward, y leftward, and z updward.
+- **Length, width and height** are the dimensions of the object along
+  x, y and z axes respectively.
+- In **camera sensor coordinates**, x points rightward, y points
+  downward, z point forward.
+- In **image coordinates**, x is the pixel column index starting from
+  the left, y is the pixel row index starting from the top, z is the
+  depth in meters along the optical axis.
+- In **lidar coordinates**, x points in the same direction as the ego
+  car, y points leftward, z points upward.
 
 The differences with raw dataset conventions are documented in each
 datasets class.
@@ -56,12 +59,12 @@ relatively to the position of that camera at this timestamp.
 All datasets implement a common interface which provides access to data
 samples such as:
 
--   Sensor frames.
--   Acquisition timestamps.
--   Sensor poses.
--   Camera images.
--   Lidar point clouds.
--   3D box annotations.
+- Sensor frames.
+- Acquisition timestamps.
+- Sensor poses.
+- Camera images.
+- Lidar point clouds.
+- 3D box annotations.
 
 Moreover, a powerful `.alignment()` function can compute the geometric transformation between any pair of frame and sensors coordinates.
 The [tutorial notebook](docs/source/example.ipynb) goes through most of these functions.
@@ -80,18 +83,18 @@ facilitate the creation of new keyframes.
 
 ## Geometric transformations
 
-Tri3D provides a small library which facilitates the creation and
+Tri3D provides a module which facilitates the creation and
 manipulation of typical 3D geometric transformations: translation,
-rotation, affine, camera projections.
+rotation, affine, camera projections, pose interpolation.
 
 Transformations have a shared interface which supports:
 
--   **Batching**: list of transformations can be grouped together, and
-    broadcasting rules are supported.
--   **Application** to 3D points: applying the transformations to
-    points, again, boadcasting rules are implemented.
--   **Composition**: it is possible to chain transformation together.
--   **Inversion**: the inverse of a transformation is readily available.
+- **Batching**: list of transformations can be grouped together, and
+  broadcasting rules are supported.
+- **Application** to 3D points: applying the transformations to
+  points, again, boadcasting rules are implemented.
+- **Composition**: it is possible to chain transformation together.
+- **Inversion**: the inverse of a transformation is readily available.
 
 ## Object and sensor poses
 

@@ -12,6 +12,7 @@ Datasets
 
    Box
    AbstractDataset
+   Argoverse2
    NuScenes
    Once
    SemanticKITTI
