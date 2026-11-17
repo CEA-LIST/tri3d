@@ -111,7 +111,7 @@ def as_euler(seq: str, quat: np.ndarray, degrees: bool = False):
 
 
 @nb.guvectorize(
-    [(nb.int32, nb.int32, nb.int32, nb.bool, nb.float64[:], nb.float64[:])],
+    [(nb.int32, nb.int32, nb.int32, nb.boolean, nb.float64[:], nb.float64[:])],
     "(),(),(),(),(m),(n)",
 )
 def as_euler_nb(
