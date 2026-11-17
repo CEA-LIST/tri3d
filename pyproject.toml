@@ -1,7 +1,6 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-
-requires = [ "setuptools", "setuptools-scm" ]
+requires = [ "setuptools>=70.1", "setuptools-scm" ]
 
 [project]
 name = "tri3d"
@@ -15,11 +14,11 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 dynamic = [ "version" ]
-
-dependencies = [ "numba", "numpy", "pillow", "pyarrow" ]
-optional-dependencies.align_nuscenes = [ "torch", "torch-cluster", "tqdm" ]
+dependencies = [ "numba>=0.65", "numpy", "pillow", "pyarrow>=23.0.1" ]
+optional-dependencies.align-nuscenes = [ "torch", "torch-cluster", "tqdm" ]
 optional-dependencies.plot = [ "k3d", "matplotlib" ]
 
 [dependency-groups]
@@ -33,12 +32,13 @@ dev = [
   "nbsphinx",
   "nbstripout",
   "pyproject-fmt>=2.6",
+  "pyrefly",
   "pytest",
   "pytest-cov",
   "ruff",
   "scipy",
   "sphinx",
-  "sphinxrun @ git+https://github.com/nlgranger/sphinxrun.git",
+  "sphinxcontrib-run",
 ]
 
 [tool.setuptools]
@@ -46,29 +46,26 @@ packages = [ "tri3d" ]
 
 [tool.setuptools_scm]
 
+[tool.uv]
+sources.torch-cluster = { index = "pyg" }
+sources.torch-scatter = { index = "pyg" }
+index = [
+  { name = "pyg", url = "https://data.pyg.org/whl/torch-2.7.0+cu126.html", ignore-error-codes = [ 403 ], format = "flat" },
+]
+extra-build-dependencies.pyarrow = [ "pkg_resources" ]
+
 [tool.ruff]
 extend-include = [ "*.ipynb" ]
-
 lint.extend-select = [ "I" ]
 lint.fixable = [ "ALL" ]
 
-[tool.pytest.ini_options]
-testpaths = [ "tests" ]
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
 
-[tool.coverage.report]
-exclude_lines = [
+[tool.coverage]
+report.exclude_lines = [
   "@abstractmethod",
   "__repr__",
-  "raise ValueError",
   "raise NotImplementedError",
+  "raise ValueError",
 ]
-
-[[tool.uv.index]]
-name = "pyg"
-url = "https://data.pyg.org/whl/torch-2.7.0+cu126.html"
-ignore-error-codes = [ 403 ]
-format = "flat"
-
-[tool.uv.sources]
-torch-scatter = { index = "pyg" }
-torch-cluster = { index = "pyg" }
